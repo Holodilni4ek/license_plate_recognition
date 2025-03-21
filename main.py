@@ -70,7 +70,7 @@ class MainFrame(wx.Frame):
                 Download()
                 if not all(
                     os.path.isfile(f)
-                    for f in ["model_resnet.tflite", "model1_nomer.tflite"]
+                    for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
                 ):
                     raise Exception("Не удалось загрузить все модели")
                 self.log_message("Модели успешно загружены!\n")
@@ -88,7 +88,7 @@ class MainFrame(wx.Frame):
         self.observer = Observer()
         self.observer.schedule(FileWatcher(self), path, recursive=False)
         self.observer.start()
-        self.log_message(f"Наблюдение за папкой {path} запущено...\n")
+        self.log_message(f"Наблюдение за папкой {path[2:]} запущено...\n")
 
     def process_new_file(self, file_path):
         """Обработка нового файла"""
@@ -102,7 +102,7 @@ class MainFrame(wx.Frame):
                 # Проверка наличия моделей
                 if not all(
                     os.path.isfile(f)
-                    for f in ["model_resnet.tflite", "model1_nomer.tflite"]
+                    for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
                 ):
                     raise FileNotFoundError(
                         "Модели не найдены! Проверьте подключение к интернету"
@@ -165,13 +165,14 @@ def Download():
                 with open("./model_resnet.tflite", "wb") as f:
                     f.write(response.content)
 
-        if not os.path.isfile("model1_nomer.tflite"):
-            print("Загрузка model1_nomer.tflite...")
+        if not os.path.isfile("model_number_recognition.tflite"):
+            print("Загрузка model_number_recognition.tflite...")
             gdown.download(
                 "https://drive.google.com/uc?id=1aBqB4QDKfYpoPBWLIrjwokVXf2xJ1hfs",
                 "model1_nomer.tflite",
                 quiet=True,
             )
+            os.rename("model1_nomer.tflite", "model_number_recognition.tflite")
     except requests.exceptions.RequestException as e:
         raise Exception(f"Ошибка подключения: {str(e)}")
 
@@ -190,7 +191,7 @@ def DecodeBatch(out):
 def Recognition(file_path, frame):
     try:
         modelRecPath = "model_resnet.tflite"
-        modelPath = "model1_nomer.tflite"
+        modelPath = "model_number_recognition.tflite"
 
         # Чтение изображения
         image0 = cv2.imread(file_path, 1)
