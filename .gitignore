@@ -1,0 +1,16 @@
+# .gitignore
+
+# virtual environment
+venv/
+.env
+
+# git repository
+.git/
+
+# python dependency
+__pycache__/
+*.pyc
+
+# docker dependency
+.dockerignore
+.gitattributes
