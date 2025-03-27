@@ -41,18 +41,34 @@ class FileWatcher(FileSystemEventHandler):
 class MainFrame(wx.Frame):
     def __init__(self):
         super().__init__(None, title="Распознавание номеров", size=(1000, 800))
-        self.panel = wx.Panel(self)
         self.SetMinSize((800, 600))
 
-        # Элементы интерфейса
-        self.text_ctrl = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
-        self.image_ctrl = wx.StaticBitmap(self.panel)
+        # Сплиттер для разделения окна
+        splitter = wx.SplitterWindow(self)
 
-        # Настройка лэйаута
-        vbox = wx.BoxSizer(wx.VERTICAL)
-        vbox.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 5)
-        vbox.Add(self.image_ctrl, 1, wx.EXPAND | wx.ALL, 5)
-        self.panel.SetSizer(vbox)
+        # Левая панель — для изображений
+        self.left_panel = wx.Panel(splitter)
+        self.image_ctrl = wx.StaticBitmap(self.left_panel)
+
+        # Правая панель — для логов
+        self.right_panel = wx.Panel(splitter)
+        self.text_ctrl = wx.TextCtrl(
+            self.right_panel, style=wx.TE_MULTILINE | wx.TE_READONLY
+        )
+
+        # Лэйауты
+        img_box = wx.BoxSizer(wx.VERTICAL)
+        img_box.Add(self.image_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+        self.left_panel.SetSizer(img_box)
+
+        log_box = wx.BoxSizer(wx.VERTICAL)
+        log_box.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+        self.right_panel.SetSizer(log_box)
+
+        # Сплиттер между картинками и логами
+        splitter.SplitVertically(self.left_panel, self.right_panel)
+        splitter.SetSashGravity(0.4)  # 40% для картинок, 60% для логов
+        splitter.SetMinimumPaneSize(300)
 
         # Перенаправление вывода
         sys.stdout = RedirectText(self.text_ctrl)
@@ -80,8 +96,8 @@ class MainFrame(wx.Frame):
         threading.Thread(target=download_task).start()
 
     def start_file_watcher(self):
-        """Запуск наблюдателя за папкой Object"""
-        path = "./Object"
+        """Запуск наблюдателя за папкой plates"""
+        path = "./plates"
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -141,13 +157,36 @@ class MainFrame(wx.Frame):
         wx.CallAfter(self.text_ctrl.AppendText, message)
 
     def show_image(self, img):
-        """Отображает изображение в интерфейсе"""
+        """Отображает изображение в интерфейсе с масштабированием"""
         if img is not None:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
             h, w = img.shape[:2]
             img_pil = Image.fromarray(img)
-            img_wx = wx.Bitmap.FromBuffer(w, h, img_pil.tobytes())
-            wx.CallAfter(self.image_ctrl.SetBitmap, img_wx)
+
+            # Конвертация в wx.Image
+            wx_img = wx.Image(img_pil.size[0], img_pil.size[1])
+            wx_img.SetData(img_pil.convert("RGB").tobytes())
+
+            # Получение размеров области отображения
+            ctrl_size = self.image_ctrl.GetSize()
+            ctrl_w, ctrl_h = ctrl_size.GetWidth(), ctrl_size.GetHeight()
+
+            # Масштабирование с сохранением пропорций
+            img_ratio = w / h
+            ctrl_ratio = ctrl_w / ctrl_h
+
+            if img_ratio > ctrl_ratio:
+                new_w = ctrl_w
+                new_h = int(ctrl_w / img_ratio)
+            else:
+                new_h = ctrl_h
+                new_w = int(ctrl_h * img_ratio)
+
+            wx_img = wx_img.Scale(new_w, new_h)
+
+            # Отображение изображения
+            wx.CallAfter(self.image_ctrl.SetBitmap, wx.Bitmap(wx_img))
 
 
 # Ваши оригинальные функции с модификациями
@@ -155,24 +194,19 @@ def Download():
     try:
         if not os.path.isfile("model_resnet.tflite"):
             print("Загрузка model_resnet.tflite...")
-            API_ENDPOINT = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key={}"
-            link_r = requests.get(
-                API_ENDPOINT.format("https://disk.yandex.ru/d/QavLH1pvpRhLOA"),
-                timeout=10,
+            gdown.download(
+                "https://disk.yandex.ru/d/QavLH1pvpRhLOA",
+                "model_resnet.tflite",
+                quiet=True,
             )
-            response = requests.get(link_r.json()["href"], timeout=30)
-            if response.status_code == 200:
-                with open("./model_resnet.tflite", "wb") as f:
-                    f.write(response.content)
 
         if not os.path.isfile("model_number_recognition.tflite"):
             print("Загрузка model_number_recognition.tflite...")
             gdown.download(
-                "https://github.com/sovse/tflite_avto_num_recognation.git",
-                "model1_nomer.tflite",
+                "https://github.com/sovse/tflite_avto_num_recognation/blob/main/model1_nomer.tflite",
+                "model_number_recognition.tflite",
                 quiet=True,
             )
-            os.rename("model1_nomer.tflite", "model_number_recognition.tflite")
     except requests.exceptions.RequestException as e:
         raise Exception(f"Ошибка подключения: {str(e)}")
 
