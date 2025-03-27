@@ -168,7 +168,7 @@ def Download():
         if not os.path.isfile("model_number_recognition.tflite"):
             print("Загрузка model_number_recognition.tflite...")
             gdown.download(
-                "https://drive.google.com/uc?id=1aBqB4QDKfYpoPBWLIrjwokVXf2xJ1hfs",
+                "https://github.com/sovse/tflite_avto_num_recognation.git",
                 "model1_nomer.tflite",
                 quiet=True,
             )
