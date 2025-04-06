@@ -12,6 +12,7 @@ import requests
 import tensorflow as tf
 import wx
 import wx.grid
+from dotenv import load_dotenv
 from PIL import Image
 from skimage.color import rgb2gray
 from skimage.feature import canny
@@ -20,20 +21,23 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 
-# Константы подключения к БД
-DB_HOST = "localhost"
-DB_PORT = "5432"
-DB_NAME = "local"
-DB_USER = "postgres"
-DB_PASSWORD = "12345678"  # Замени на свой пароль
+TF_ENABLE_ONEDNN_OPTS = 0
+
+
+load_dotenv(".env")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
 class RedirectText:
-    def __init__(self, text_ctrl):
-        self.text_ctrl = text_ctrl
+    def __init__(self, text):
+        self.text = text
 
     def write(self, text):
-        wx.CallAfter(self.text_ctrl.AppendText, text)
+        wx.CallAfter(self.text.AppendText, text)
 
     def flush(self):
         pass
@@ -128,19 +132,31 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Автоматическое подстраивание ширины столбцов
         self.logGrid.AutoSizeColumns()
 
-        # Добавление кнопки экспорта под таблицу
-        buttonSizer = wx.BoxSizer(wx.VERTICAL)
-        self.exportButton = wx.Button(
-            parent, wx.ID_ANY, "Экспорт в Excel", wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        buttonSizer.Add(self.exportButton, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
-
-        panel.Add(buttonSizer, 0, wx.EXPAND, 5)
-
-        # Привязка обработчика события к кнопке
-        self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
+        # Добавление панели кнопок под таблицу
+        panel.Add(self.create_buttons_panel(parent), 0, wx.EXPAND, 5)
 
         return panel
+
+    def create_buttons_panel(self, parent):
+        """Создаёт панель с кнопками 'Экспорт' и 'Обновить'."""
+        buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Кнопка экспорт
+        self.exportButton = wx.Button(parent, wx.ID_ANY, "Экспорт в Excel")
+        buttonSizer.Add(self.exportButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # Разделитель между кнопками
+        buttonSizer.AddSpacer(10)
+
+        # Кнопка обновить
+        self.updateButton = wx.Button(parent, wx.ID_ANY, "Обновить")
+        buttonSizer.Add(self.updateButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # Привязка обработчиков событий
+        self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
+        self.updateButton.Bind(wx.EVT_BUTTON, self.update)
+
+        return buttonSizer
 
     def create_main_layout(self):
         """Создаёт и размещает основные сайзеры."""
@@ -151,12 +167,12 @@ class LicensePlateRecognitionApp(wx.Frame):
         highSizer.Add(self.create_img_panel(self), 1, wx.EXPAND, 5)
         highSizer.Add(self.create_log_panel(self), 1, wx.EXPAND, 5)
 
-        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
-
         # Нижний сайзер (таблица логов + кнопка)
         downSizer = wx.BoxSizer(wx.VERTICAL)
         downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
 
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
         mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
 
         self.SetSizer(mainSizer)
@@ -209,7 +225,7 @@ class LicensePlateRecognitionApp(wx.Frame):
                 raise Exception("Не удалось загрузить все модели")
             wx.CallAfter(self.log_message, "Модели успешно загружены!\n")
         except Exception as e:
-            wx.CallAfter(self.log_message, f"Ошибка загрузки: {str(e)}\n")
+            wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
 
     # Наблюдение за папкой
     def start_file_watcher(self):
@@ -254,24 +270,83 @@ class LicensePlateRecognitionApp(wx.Frame):
                 )
                 if self.is_number_registered(recognized_number):
                     wx.CallAfter(self.log_message, "Вход разрешен\n")
+                    self.AddInLog(recognized_number)
                 else:
                     wx.CallAfter(self.log_message, "Вход запрещен\n")
             else:
                 wx.CallAfter(self.log_message, "Номер не распознан\n")
 
         except Exception as e:
-            wx.CallAfter(self.log_message, f"\nОШИБКА: {str(e)}\n")
+            wx.CallAfter(self.log_message, f"\nОШИБКА РАСПОЗНАВАНИЯ: {str(e)}\n")
 
     def is_number_registered(self, number):
-        """Проверка, зарегистрирован ли номер в файле registered.txt"""
-        if not os.path.isfile("registered.txt"):
-            self.log_message("Файл registered.txt не найден\n")
-            return False
+        """Загружает зарегистрированные номера из базы данных."""
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
 
-        with open("registered.txt", "r") as f:
-            registered_numbers = [line.strip() for line in f.readlines()]
+            cursor.execute("SELECT vehiclemark FROM vehicle;")
+            numbers = {row[0] for row in cursor.fetchall()}
 
-        return number in registered_numbers
+            cursor.close()
+            conn.close()
+
+            return number in numbers
+
+        except Exception as e:
+            print(f"ОШИБКА ПРОВЕРКИ НОМЕРА: {e}")
+            return set()
+        finally:
+            cursor.close()
+            conn.close()
+
+    def AddInLog(self, number):
+        """Добавление распознанной и идентифицированной машины в журнал"""
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
+
+            query = """
+            SELECT
+                id_vehicle
+            FROM vehicle
+            WHERE vehiclemark = %s
+            """
+            cursor.execute(query, (number,))
+            row = cursor.fetchall()
+
+            # Запрос данных
+            query = """
+            INSERT INTO log (
+            id_vehicle, 
+            transittime, 
+            transittype
+            )
+            VALUES
+            (
+            %s, 
+            CURRENT_TIMESTAMP,
+            TRUE
+            );
+            """
+            cursor.execute(query, (row[0],))
+
+        except Exception as e:
+            print(f"ОШИБКА ДОБАВЛЕНИЯ В ЖУРНАЛ: {e}")
 
     def show_image(self, img):
         """Отображает изображение в интерфейсе с масштабированием"""
@@ -333,10 +408,10 @@ class LicensePlateRecognitionApp(wx.Frame):
             CASE WHEN transittype THEN 'Заехал' 
             ELSE 'Выехал' 
             END AS status
-            FROM "logbook" AS l
-            JOIN "driver" AS d ON l.id_driver = d.id_driver
-            JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
-            ORDER BY id_logbook ASC
+            FROM "log" AS l
+			JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+            JOIN "driver" AS d ON v.id_driver = d.id_driver
+            ORDER BY l.transittime DESC
             LIMIT 50
             """
             cursor.execute(query)
@@ -359,7 +434,64 @@ class LicensePlateRecognitionApp(wx.Frame):
             self.update_grid()  # Автоматическое подстраивание колонок после добавления данных
 
         except Exception as e:
-            wx.MessageBox(f"Ошибка загрузки данных: {e}", "Ошибка", wx.ICON_ERROR)
+            wx.MessageBox(f"ОШИБКА ЗАГРУЗКИ ДАННЫХ: {e}", "Ошибка", wx.ICON_ERROR)
+        finally:
+            cursor.close()
+            conn.close()
+
+    # Обновление журнала
+    def update(self, event):
+        """Обновление журнала без полной перезагрузки таблицы"""
+
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
+
+            # Запрос данных
+            query = """
+            SELECT
+            CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
+            CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
+            l.transittime,
+            CASE WHEN transittype THEN 'Заехал' 
+            ELSE 'Выехал' 
+            END AS status
+            FROM "log" AS l
+			JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+            JOIN "driver" AS d ON v.id_driver = d.id_driver
+            ORDER BY l.transittime DESC
+            LIMIT 50
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            # Получаем текущее количество строк в таблице wx.Grid
+            current_rows = self.logGrid.GetNumberRows()
+
+            # Если в БД больше строк, чем в Grid, добавляем недостающие
+            if len(rows) > current_rows:
+                self.logGrid.AppendRows(len(rows) - current_rows)
+
+            # Обновляем данные в wx.Grid
+            for row_index, row in enumerate(rows):
+                for col_index, value in enumerate(row):
+                    self.logGrid.SetCellValue(row_index, col_index, str(value))
+
+            # Если в Grid больше строк, чем в БД, удаляем лишние
+            if len(rows) < current_rows:
+                self.logGrid.DeleteRows(len(rows), current_rows - len(rows))
+        except Exception as e:
+            wx.MessageBox(f"ОШИБКА ОБНОВЛЕНИЯ ЖУРНАЛА: {e}", "Ошибка", wx.ICON_ERROR)
+        finally:
+            cursor.close()
+            conn.close()
 
     # Выгрузка журнала
     def export_to_excel(self, event):
@@ -379,6 +511,8 @@ class LicensePlateRecognitionApp(wx.Frame):
                     user=DB_USER,
                     password=DB_PASSWORD,
                 )
+
+                # Запрос
                 query = f"""
                 SELECT
                 CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
@@ -387,13 +521,13 @@ class LicensePlateRecognitionApp(wx.Frame):
                 CASE WHEN transittype THEN 'Заехал' 
                 ELSE 'Выехал' 
                 END AS status
-                FROM "logbook" AS l
-                JOIN "driver" AS d ON l.id_driver = d.id_driver
-                JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
-                ORDER BY id_logbook ASC
+                FROM "log" AS l
+				JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+                JOIN "driver" AS d ON v.id_driver = d.id_driver
+                ORDER BY l.transittime DESC
                 LIMIT {row_count}
                 """
-                df = pd.read_sql(query, conn)
+                df = pd.read_sql(query, conn)  # Pandas DataFrame (df)
                 conn.close()
 
                 # Сохранение Excel на рабочем столе
@@ -408,7 +542,9 @@ class LicensePlateRecognitionApp(wx.Frame):
                 )
 
             except Exception as e:
-                wx.MessageBox(f"Ошибка выгрузки: {e}", "Ошибка", wx.ICON_ERROR)
+                wx.MessageBox(f"ОШИБКА ЭКСПОРТА: {e}", "Ошибка", wx.ICON_ERROR)
+            finally:
+                conn.close()
 
         dlg.Destroy()
 
@@ -434,7 +570,7 @@ def Download():
                 quiet=True,
             )
     except requests.exceptions.RequestException as e:
-        raise Exception(f"Ошибка подключения: {str(e)}")
+        raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К ИНТЕРНЕТ: {str(e)}")
 
 
 def DecodeBatch(out):
@@ -549,7 +685,7 @@ def Recognition(file_path, frame):
             return None
 
     except Exception as e:
-        print(f"Ошибка при распознавании: {str(e)}")
+        print(f"ОШИБКА РАСПОЗНОВАНИЯ: {str(e)}")
         return None
 
 
