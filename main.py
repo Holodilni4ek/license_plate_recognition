@@ -9,7 +9,10 @@ import numpy as np
 import pandas as pd
 import psycopg2
 import requests
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
+
 import wx
 import wx.grid
 from dotenv import load_dotenv
@@ -269,8 +272,8 @@ class LicensePlateRecognitionApp(wx.Frame):
                     self.log_message, f"Распознанный номер: {recognized_number}\n"
                 )
                 if self.is_number_registered(recognized_number):
-                    wx.CallAfter(self.log_message, "Вход разрешен\n")
                     self.AddInLog(recognized_number)
+                    wx.CallAfter(self.log_message, "Вход разрешен\n")
                 else:
                     wx.CallAfter(self.log_message, "Вход запрещен\n")
             else:
@@ -321,32 +324,33 @@ class LicensePlateRecognitionApp(wx.Frame):
             cursor = conn.cursor()
 
             query = """
-            SELECT
-                id_vehicle
-            FROM vehicle
-            WHERE vehiclemark = %s
-            """
-            cursor.execute(query, (number,))
-            row = cursor.fetchall()
-
-            # Запрос данных
-            query = """
-            INSERT INTO log (
-            id_vehicle, 
-            transittime, 
-            transittype
+            WITH get_vehicle AS (
+                SELECT id_vehicle 
+                FROM vehicle 
+                WHERE vehiclemark = %s
+                LIMIT 1
             )
-            VALUES
-            (
-            %s, 
-            CURRENT_TIMESTAMP,
-            TRUE
-            );
+            INSERT INTO log (
+                id_vehicle, 
+                transittime, 
+                transittype
+            )
+            SELECT 
+                id_vehicle,  -- Используем значение из CTE, а не "1"
+                DATE_TRUNC('second', CURRENT_TIMESTAMP),
+                TRUE
+            FROM get_vehicle;
             """
-            cursor.execute(query, (row[0],))
+
+            # Параметр передается как кортеж с одним элементом
+            cursor.execute(query, ("M555MM24",))
+            conn.commit()
 
         except Exception as e:
             print(f"ОШИБКА ДОБАВЛЕНИЯ В ЖУРНАЛ: {e}")
+        finally:
+            cursor.close()
+            conn.close()
 
     def show_image(self, img):
         """Отображает изображение в интерфейсе с масштабированием"""
