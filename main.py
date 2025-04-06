@@ -14,6 +14,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 
 import wx
+import wx.adv
 import wx.grid
 from dotenv import load_dotenv
 from PIL import Image
@@ -74,9 +75,6 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Устанавливаем иконку
         self.SetIcon(wx.Icon("app_icon.ico", wx.BITMAP_TYPE_ICO))
 
-        # Настройка цветов
-        # self._setup_colors()
-
         # Создание основного макета
         self.create_main_layout()
         self.Centre(wx.BOTH)
@@ -106,6 +104,9 @@ class LicensePlateRecognitionApp(wx.Frame):
         self.logGrid = wx.grid.Grid(
             parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0
         )
+
+        # Настройка цветов
+        self.setup_colors()
 
         # Настройка таблицы
         self.logGrid.CreateGrid(5, 4)
@@ -151,13 +152,41 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Разделитель между кнопками
         buttonSizer.AddSpacer(10)
 
-        # Кнопка обновить
-        self.updateButton = wx.Button(parent, wx.ID_ANY, "Обновить")
-        buttonSizer.Add(self.updateButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        # # Кнопка обновить
+        # self.updateButton = wx.Button(parent, wx.ID_ANY, "Обновить")
+        # buttonSizer.Add(self.updateButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # # Разделитель между кнопками
+        # buttonSizer.AddSpacer(10)
+
+        # Кнопка выбора даты
+        self.datePicker = wx.adv.DatePickerCtrl(
+            self,
+            wx.ID_ANY,
+            wx.DefaultDateTime,
+            wx.DefaultPosition,
+            wx.DefaultSize,
+            style=wx.adv.DP_DROPDOWN | wx.adv.DP_SHOWCENTURY,
+        )
+        buttonSizer.Add(self.datePicker, 0, wx.ALL, 5)
+
+        # Установить текущую дату
+        self.datePicker.SetValue(wx.DateTime.Now())
+
+        # Установить минимальную и максимальную даты
+        min_date = wx.DateTime()
+        min_date.ParseDate("2025-01-01")
+
+        max_date = wx.DateTime()
+        max_date.ParseDate("2025-12-31")
+
+        # Можно выбрать даты только в 2025 году
+        self.datePicker.SetRange(min_date, max_date)
 
         # Привязка обработчиков событий
         self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
-        self.updateButton.Bind(wx.EVT_BUTTON, self.update)
+        # self.updateButton.Bind(wx.EVT_BUTTON, self.update)
+        self.datePicker.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_change)
 
         return buttonSizer
 
@@ -181,19 +210,6 @@ class LicensePlateRecognitionApp(wx.Frame):
         self.SetSizer(mainSizer)
         self.Layout()
 
-        # ! Fix
-        # def _setup_colors(self):
-        #     """Настройка цветовой схемы"""
-        #     bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        #     self.SetBackgroundColour(bg_color)
-
-        #     # Настройка таблицы
-        #     self.logGrid.SetBackgroundColour(bg_color)
-        #     self.logGrid.SetDefaultCellBackgroundColour(bg_color)
-        #     self.logGrid.SetLabelBackgroundColour(
-        #         wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
-        #     )
-
         # Перенаправление вывода
         sys.stdout = RedirectText(self.logPanel)
 
@@ -206,11 +222,27 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Загрузка данных в таблицу
         self.load_data_from_db()
 
-    # & -----------------  Методы заполнения  -----------------  #
+    def setup_colors(self):
+        """Настройка цветовой схемы"""
+        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.SetBackgroundColour(bg_color)
+
+        # Настройка таблицы
+        self.logGrid.SetBackgroundColour(bg_color)
+        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
+        self.logGrid.SetLabelBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        )
+
+    # & -----------------  Обработчики  -----------------  #
+
+    # & -----------------  Лог  -----------------  #
 
     # Текстовый поток
     def log_message(self, message):
         wx.CallAfter(self.logPanel.AppendText, message)
+
+    # & -----------------  Распознование  ---------------  #
 
     # Загрузка моделей
     def download_models(self):
@@ -220,7 +252,7 @@ class LicensePlateRecognitionApp(wx.Frame):
         """Фоновая загрузка моделей"""
         try:
             wx.CallAfter(self.log_message, "Поиск моделей...\n")
-            Download()
+            self.Download()
             if not all(
                 os.path.isfile(f)
                 for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
@@ -266,14 +298,15 @@ class LicensePlateRecognitionApp(wx.Frame):
                 )
 
             # Запуск распознавания
-            recognized_number = Recognition(file_path, self)
+            recognized_number = self.Recognition(file_path, self)
             if recognized_number:
                 wx.CallAfter(
                     self.log_message, f"Распознанный номер: {recognized_number}\n"
                 )
                 if self.is_number_registered(recognized_number):
-                    self.AddInLog(recognized_number)
+                    self.load_data_to_db(recognized_number)
                     wx.CallAfter(self.log_message, "Вход разрешен\n")
+                    self.on_date_change()
                 else:
                     wx.CallAfter(self.log_message, "Вход запрещен\n")
             else:
@@ -310,47 +343,7 @@ class LicensePlateRecognitionApp(wx.Frame):
             cursor.close()
             conn.close()
 
-    def AddInLog(self, number):
-        """Добавление распознанной и идентифицированной машины в журнал"""
-        try:
-            # Подключение к БД
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                dbname=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD,
-            )
-            cursor = conn.cursor()
-
-            query = """
-            WITH get_vehicle AS (
-                SELECT id_vehicle 
-                FROM vehicle 
-                WHERE vehiclemark = %s
-                LIMIT 1
-            )
-            INSERT INTO log (
-                id_vehicle, 
-                transittime, 
-                transittype
-            )
-            SELECT 
-                id_vehicle,  -- Используем значение из CTE, а не "1"
-                DATE_TRUNC('second', CURRENT_TIMESTAMP),
-                TRUE
-            FROM get_vehicle;
-            """
-
-            # Параметр передается как кортеж с одним элементом
-            cursor.execute(query, ("M555MM24",))
-            conn.commit()
-
-        except Exception as e:
-            print(f"ОШИБКА ДОБАВЛЕНИЯ В ЖУРНАЛ: {e}")
-        finally:
-            cursor.close()
-            conn.close()
+    # & -----------------  Изображение  -----------------  #
 
     def show_image(self, img):
         """Отображает изображение в интерфейсе с масштабированием"""
@@ -384,13 +377,26 @@ class LicensePlateRecognitionApp(wx.Frame):
             # Отображение изображения
             wx.CallAfter(self.IMG.SetBitmap, wx.Bitmap(wx_img))
 
+    # & -----------------  Журнал  -----------------  #
+
     # Динамическое обновление журнала
+    def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
+        """Обработчик на изменение даты"""
+        # Получить объект wx.DateTime
+        current_date = self.datePicker.GetValue()
+
+        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
+        date = current_date.FormatISODate()  # Пример: "2025-03-12"
+
+        self.load_data_from_db(date)
+
+    # Динамическое обновление столбцов
     def update_grid(self):
         """Обновляет размеры столбцов после добавления данных."""
         self.logGrid.AutoSizeColumns()
 
     # Подгрузка журнала
-    def load_data_from_db(self):
+    def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
         """Загружает данные из PostgreSQL в таблицу"""
         try:
             # Подключение к БД
@@ -415,66 +421,17 @@ class LicensePlateRecognitionApp(wx.Frame):
             FROM "log" AS l
 			JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
             JOIN "driver" AS d ON v.id_driver = d.id_driver
+            WHERE l.transittime::date = %s
             ORDER BY l.transittime DESC
             LIMIT 50
             """
-            cursor.execute(query)
+            cursor.execute(query, (date,))
             rows = cursor.fetchall()
 
             # Очистка сетки перед обновлением
             self.logGrid.ClearGrid()
             if self.logGrid.GetNumberRows() > 0:
                 self.logGrid.DeleteRows(0, self.logGrid.GetNumberRows())
-
-            # Заполнение таблицы
-            self.logGrid.AppendRows(len(rows))
-            for row_idx, row in enumerate(rows):
-                for col_idx, value in enumerate(row):
-                    self.logGrid.SetCellValue(row_idx, col_idx, str(value))
-
-            cursor.close()
-            conn.close()
-
-            self.update_grid()  # Автоматическое подстраивание колонок после добавления данных
-
-        except Exception as e:
-            wx.MessageBox(f"ОШИБКА ЗАГРУЗКИ ДАННЫХ: {e}", "Ошибка", wx.ICON_ERROR)
-        finally:
-            cursor.close()
-            conn.close()
-
-    # Обновление журнала
-    def update(self, event):
-        """Обновление журнала без полной перезагрузки таблицы"""
-
-        try:
-            # Подключение к БД
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                dbname=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD,
-            )
-            cursor = conn.cursor()
-
-            # Запрос данных
-            query = """
-            SELECT
-            CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
-            CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
-            l.transittime,
-            CASE WHEN transittype THEN 'Заехал' 
-            ELSE 'Выехал' 
-            END AS status
-            FROM "log" AS l
-			JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
-            JOIN "driver" AS d ON v.id_driver = d.id_driver
-            ORDER BY l.transittime DESC
-            LIMIT 50
-            """
-            cursor.execute(query)
-            rows = cursor.fetchall()
 
             # Получаем текущее количество строк в таблице wx.Grid
             current_rows = self.logGrid.GetNumberRows()
@@ -491,11 +448,65 @@ class LicensePlateRecognitionApp(wx.Frame):
             # Если в Grid больше строк, чем в БД, удаляем лишние
             if len(rows) < current_rows:
                 self.logGrid.DeleteRows(len(rows), current_rows - len(rows))
+
+            cursor.close()
+            conn.close()
+
+            # Автоматическое подстраивание колонок после добавления данных
+            self.update_grid()
+
         except Exception as e:
-            wx.MessageBox(f"ОШИБКА ОБНОВЛЕНИЯ ЖУРНАЛА: {e}", "Ошибка", wx.ICON_ERROR)
+            wx.MessageBox(f"ОШИБКА ЗАГРУЗКИ ДАННЫХ: {e}", "Ошибка", wx.ICON_ERROR)
         finally:
             cursor.close()
             conn.close()
+
+    def load_data_to_db(self, number):
+        """Добавление распознанной и идентифицированной машины в журнал"""
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
+
+            query = """
+            WITH get_vehicle AS (
+                SELECT id_vehicle 
+                FROM vehicle 
+                WHERE vehiclemark = %s
+                LIMIT 1
+            )
+            INSERT INTO log (
+                id_vehicle, 
+                transittime, 
+                transittype
+            )
+            SELECT 
+                id_vehicle,
+                DATE_TRUNC('second', CURRENT_TIMESTAMP),
+                TRUE
+            FROM get_vehicle;
+            """
+
+            # Параметр передается как кортеж с одним элементом
+            cursor.execute(query, (number,))
+            conn.commit()
+
+        except Exception as e:
+            print(f"ОШИБКА ДОБАВЛЕНИЯ В ЖУРНАЛ: {e}")
+        finally:
+            cursor.close()
+            conn.close()
+
+    # Обновление журнала
+    # def update(self, event):
+    #     """Обновление журнала без полной перезагрузки таблицы"""
+    #     pass
 
     # Выгрузка журнала
     def export_to_excel(self, event):
@@ -552,145 +563,146 @@ class LicensePlateRecognitionApp(wx.Frame):
 
         dlg.Destroy()
 
-    def __del__(self):
-        pass
+    # & -----------------  Свой функции  -----------------  #
 
+    def Download(self):
+        try:
+            if not os.path.isfile("model_resnet.tflite"):
+                print("Загрузка model_resnet.tflite...")
+                gdown.download(
+                    "https://disk.yandex.ru/d/QavLH1pvpRhLOA",
+                    "model_resnet.tflite",
+                    quiet=True,
+                )
 
-def Download():
-    try:
-        if not os.path.isfile("model_resnet.tflite"):
-            print("Загрузка model_resnet.tflite...")
-            gdown.download(
-                "https://disk.yandex.ru/d/QavLH1pvpRhLOA",
-                "model_resnet.tflite",
-                quiet=True,
-            )
+            if not os.path.isfile("model_number_recognition.tflite"):
+                print("Загрузка model_number_recognition.tflite...")
+                gdown.download(
+                    "https://github.com/sovse/tflite_avto_num_recognation/blob/main/model1_nomer.tflite",
+                    "model_number_recognition.tflite",
+                    quiet=True,
+                )
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К ИНТЕРНЕТ: {str(e)}")
 
-        if not os.path.isfile("model_number_recognition.tflite"):
-            print("Загрузка model_number_recognition.tflite...")
-            gdown.download(
-                "https://github.com/sovse/tflite_avto_num_recognation/blob/main/model1_nomer.tflite",
-                "model_number_recognition.tflite",
-                quiet=True,
-            )
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К ИНТЕРНЕТ: {str(e)}")
+    def DecodeBatch(self, out):
+        letters = "0 1 2 3 4 5 6 7 8 9 A B C E H K M O P T X Y".split()
+        ret = []
+        for j in range(out.shape[0]):
+            out_best = list(np.argmax(out[j, 2:], 1))
+            out_best = [k for k, g in itertools.groupby(out_best)]
+            outstr = "".join([letters[c] for c in out_best if c < len(letters)])
+            ret.append(outstr)
+        return ret
 
+    def Recognition(self, file_path, frame):
+        try:
+            modelRecPath = "model_resnet.tflite"
+            modelPath = "model_number_recognition.tflite"
 
-def DecodeBatch(out):
-    letters = "0 1 2 3 4 5 6 7 8 9 A B C E H K M O P T X Y".split()
-    ret = []
-    for j in range(out.shape[0]):
-        out_best = list(np.argmax(out[j, 2:], 1))
-        out_best = [k for k, g in itertools.groupby(out_best)]
-        outstr = "".join([letters[c] for c in out_best if c < len(letters)])
-        ret.append(outstr)
-    return ret
+            # Чтение изображения
+            image0 = cv2.imread(file_path, 1)
+            if image0 is None:
+                raise ValueError("Не удалось прочитать изображение")
 
+            # Обработка изображения
+            image_height, image_width, _ = image0.shape
+            image = cv2.resize(image0, (1024, 1024))
+            image = image.astype(np.float32)
 
-def Recognition(file_path, frame):
-    try:
-        modelRecPath = "model_resnet.tflite"
-        modelPath = "model_number_recognition.tflite"
-
-        # Чтение изображения
-        image0 = cv2.imread(file_path, 1)
-        if image0 is None:
-            raise ValueError("Не удалось прочитать изображение")
-
-        # Обработка изображения
-        image_height, image_width, _ = image0.shape
-        image = cv2.resize(image0, (1024, 1024))
-        image = image.astype(np.float32)
-
-        # Распознавание номера
-        interpreter = tf.lite.Interpreter(model_path=modelRecPath)
-        interpreter.allocate_tensors()
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        X_data1 = np.float32(image.reshape(1, 1024, 1024, 3))
-        interpreter.set_tensor(input_details[0]["index"], X_data1)
-        interpreter.invoke()
-        detection = interpreter.get_tensor(output_details[0]["index"])
-
-        # Отрисовка прямоугольника вокруг номера
-        img2 = cv2.cvtColor(image0, cv2.COLOR_BGR2RGB)
-        box_x = int(detection[0, 0, 0] * image_height)
-        box_y = int(detection[0, 0, 1] * image_width)
-        box_width = int(detection[0, 0, 2] * image_height)
-        box_height = int(detection[0, 0, 3] * image_width)
-
-        if np.min(detection[0, 0, :]) >= 0:
-            cv2.rectangle(
-                img2,
-                (box_y, box_x),
-                (box_height, box_width),
-                (230, 230, 21),
-                thickness=5,
-            )
-
-            # Отображение изображения в интерфейсе
-            wx.CallAfter(frame.show_image, img2)
-
-            # Распознавание текста
-            image_crop = image0[box_x:box_width, box_y:box_height, :]
-            grayscale = rgb2gray(image_crop)
-            edges = canny(grayscale, sigma=3.0)
-            out, angles, distances = hough_line(edges)
-            _, angles_peaks, _ = hough_line_peaks(out, angles, distances, num_peaks=20)
-            angle = np.mean(np.rad2deg(angles_peaks))
-
-            # Коррекция угла
-            if 0 <= angle <= 90:
-                rot_angle = angle - 90
-            elif -45 <= angle < 0:
-                rot_angle = angle - 90
-            elif -90 <= angle < -45:
-                rot_angle = 90 + angle
-            if abs(rot_angle) > 20:
-                rot_angle = 0
-
-            # Поворот изображения
-            rotated = rotate(image_crop, rot_angle, resize=True) * 255
-            rotated = rotated.astype(np.uint8)
-            rotated1 = rotated[:, :, :]
-            minus = np.abs(int(np.sin(np.radians(rot_angle)) * rotated.shape[0]))
-            if rotated.shape[1] / rotated.shape[0] < 2 and minus > 10:
-                rotated1 = rotated[minus:-minus, :, :]
-
-            # Улучшение контраста
-            lab = cv2.cvtColor(rotated1, cv2.COLOR_BGR2LAB)
-            l, a, b = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-            cl = clahe.apply(l)
-            limg = cv2.merge((cl, a, b))
-            final = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
-
-            # Распознавание текста
-            interpreter = tf.lite.Interpreter(model_path=modelPath)
+            # Распознавание номера
+            interpreter = tf.lite.Interpreter(model_path=modelRecPath)
             interpreter.allocate_tensors()
             input_details = interpreter.get_input_details()
             output_details = interpreter.get_output_details()
-            img = cv2.cvtColor(final, cv2.COLOR_BGR2GRAY)
-            img = cv2.resize(img, (128, 64))
-            img = img.astype(np.float32)
-            img /= 255
-            img1 = img.T
-            X_data1 = np.float32(img1.reshape(1, 128, 64, 1))
+            X_data1 = np.float32(image.reshape(1, 1024, 1024, 3))
             interpreter.set_tensor(input_details[0]["index"], X_data1)
             interpreter.invoke()
-            net_out_value = interpreter.get_tensor(output_details[0]["index"])
-            pred_texts = DecodeBatch(net_out_value)
+            detection = interpreter.get_tensor(output_details[0]["index"])
 
-            # Возврат распознанного номера
-            return pred_texts[0] if pred_texts else None
-        else:
-            wx.CallAfter(frame.show_image, image0)
+            # Отрисовка прямоугольника вокруг номера
+            img2 = cv2.cvtColor(image0, cv2.COLOR_BGR2RGB)
+            box_x = int(detection[0, 0, 0] * image_height)
+            box_y = int(detection[0, 0, 1] * image_width)
+            box_width = int(detection[0, 0, 2] * image_height)
+            box_height = int(detection[0, 0, 3] * image_width)
+
+            if np.min(detection[0, 0, :]) >= 0:
+                cv2.rectangle(
+                    img2,
+                    (box_y, box_x),
+                    (box_height, box_width),
+                    (230, 230, 21),
+                    thickness=5,
+                )
+
+                # Отображение изображения в интерфейсе
+                wx.CallAfter(frame.show_image, img2)
+
+                # Распознавание текста
+                image_crop = image0[box_x:box_width, box_y:box_height, :]
+                grayscale = rgb2gray(image_crop)
+                edges = canny(grayscale, sigma=3.0)
+                out, angles, distances = hough_line(edges)
+                _, angles_peaks, _ = hough_line_peaks(
+                    out, angles, distances, num_peaks=20
+                )
+                angle = np.mean(np.rad2deg(angles_peaks))
+
+                # Коррекция угла
+                if 0 <= angle <= 90:
+                    rot_angle = angle - 90
+                elif -45 <= angle < 0:
+                    rot_angle = angle - 90
+                elif -90 <= angle < -45:
+                    rot_angle = 90 + angle
+                if abs(rot_angle) > 20:
+                    rot_angle = 0
+
+                # Поворот изображения
+                rotated = rotate(image_crop, rot_angle, resize=True) * 255
+                rotated = rotated.astype(np.uint8)
+                rotated1 = rotated[:, :, :]
+                minus = np.abs(int(np.sin(np.radians(rot_angle)) * rotated.shape[0]))
+                if rotated.shape[1] / rotated.shape[0] < 2 and minus > 10:
+                    rotated1 = rotated[minus:-minus, :, :]
+
+                # Улучшение контраста
+                lab = cv2.cvtColor(rotated1, cv2.COLOR_BGR2LAB)
+                l, a, b = cv2.split(lab)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                cl = clahe.apply(l)
+                limg = cv2.merge((cl, a, b))
+                final = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+
+                # Распознавание текста
+                interpreter = tf.lite.Interpreter(model_path=modelPath)
+                interpreter.allocate_tensors()
+                input_details = interpreter.get_input_details()
+                output_details = interpreter.get_output_details()
+                img = cv2.cvtColor(final, cv2.COLOR_BGR2GRAY)
+                img = cv2.resize(img, (128, 64))
+                img = img.astype(np.float32)
+                img /= 255
+                img1 = img.T
+                X_data1 = np.float32(img1.reshape(1, 128, 64, 1))
+                interpreter.set_tensor(input_details[0]["index"], X_data1)
+                interpreter.invoke()
+                net_out_value = interpreter.get_tensor(output_details[0]["index"])
+                pred_texts = self.DecodeBatch(net_out_value)
+
+                # Возврат распознанного номера
+                return pred_texts[0] if pred_texts else None
+            else:
+                wx.CallAfter(frame.show_image, image0)
+                return None
+
+        except Exception as e:
+            print(f"ОШИБКА РАСПОЗНОВАНИЯ: {str(e)}")
             return None
 
-    except Exception as e:
-        print(f"ОШИБКА РАСПОЗНОВАНИЯ: {str(e)}")
-        return None
+    def __del__(self):
+        pass
 
 
 if __name__ == "__main__":
