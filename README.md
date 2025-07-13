@@ -1,16 +1,16 @@
-# Распознавание автомобильных номеров
+# Number Plate Recognition
 
-Этот проект предназначен для автоматического распознавания автомобильных номеров с изображений и проверки, разрешен ли въезд автомобиля на основе списка зарегистрированных номеров.
+This project is designed for the automatic recognition of number plates from images and to check whether a vehicle is allowed entry based on a list of registered numbers.
 
 ---
 
-## Требования
+## Requirements
 
-Для работы проекта необходимо установить следующие компоненты:
+To run the project, the following components must be installed:
 
-- **Python 3.8 или выше**
+- **Python 3.8 or higher**
 - **PostgreSQL**
-- **Установленные библиотеки:**
+- **Installed libraries:**
   - wxPython
   - tensorflow
   - opencv-python
@@ -23,76 +23,76 @@
 
 ---
 
-## Установка
+## Installation
 
-1. Клонируйте репозиторий с проектом:
+1. Clone the repository with the project:
 
    ```bash
    git clone https://github.com/RecognitionVLT.git
    cd RecognitionVLT
 
-2. Установите необходимые зависимости:
+2. Install the required dependencies:
 
     ```bash
     pip install -r requirements.txt
 
-3. Установите необходимые библиотеки:
+3. Install the necessary libraries:
 
     ```bash
     pip install wxPython tensorflow opencv-python scikit-image matplotlib requests gdown watchdog numpy
 
-4. Установить PostgreSQL вы можете с их официального сайта.[a link](https://www.postgresql.org/)
+4. You can install PostgreSQL from their official website. [a link](https://www.postgresql.org/)
 
-5.Импортируйте струтктуру БД на свой сервер.
-    -Таблица driver
+5. Import the database structure to your server.
+    - Table driver
     ![alt text](image-1.png)
-    -Таблица log
+    - Table log
     ![alt text](image-2.png)
-    -Таблица vehicle
+    - Table vehicle
     ![alt text](image-3.png)
 
 ---
 
-## Запуск проекта
+## Running the Project
 
-1. Перейдите в папку проекта:
+1. Navigate to the project folder:
 
     ```bash
-    cd <Путь-к-проекту>
+    cd <Path-to-project>
 
-2. Запустите проект:
+2. Launch the project:
 
     ```bash
     python main.py
 
-3. После запуска откроется графическое окно приложения.
+3. After launching, a graphical window of the application will open.
 
     ![alt text](image.png)
 
 ---
 
-## Использование
+## Usage
 
-1. Структура БД:
+1. Database structure:
 
-2. Распознавание:
+2. Recognition:
 
-    Приложение автоматически начнет распознавание, как только в папку plates будет добавлено новое изображение.
-    Результаты распознавания будут отображаться в текстовом поле приложения:
-    Если номер найден в базе данных, появится сообщение: "Вход разрешен".
-    Если номер не найден, появится сообщение: "Вход запрещен".
-    Изображение с выделенным номером будет отображаться в интерфейсе приложения.
-
----
-
-## Лицензия
-
-Этот проект распространяется под лицензией MIT. Подробнее см. в файле LICENSE.
+    The application will automatically start recognition as soon as a new image is added to the plates folder.
+    The recognition results will be displayed in the application's text field:
+    If the number is found in the database, a message will appear: "Entry allowed".
+    If the number is not found, a message will appear: "Entry denied".
+    The image with the highlighted number will be displayed in the application's interface.
 
 ---
 
-## Поддержка
+## License
 
-Если у вас возникли вопросы или проблемы, создайте issue в репозитории проекта или свяжитесь с автором:
+This project is distributed under the MIT license. For more details, see the LICENSE file.
+
+---
+
+## Support
+
+If you have any questions or issues, please create an issue in the project repository or contact the author:
     Email: <cadetstepan13@gmail.com>
     GitHub: <https://github.com/Holodilni4ek>
