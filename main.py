@@ -35,7 +35,7 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
-# ^         ОШИБКИ
+# ^ --------------------  ОШИБКИ  --------------------
 # ^
 # ^ ОШИБКА ЗАГРУЗКИ МОДЕЛИ       -> download_task
 # ^ ОШИБКА РАСПОЗНАВАНИЯ         -> recognition_task
@@ -68,8 +68,11 @@ class FileWatcher(FileSystemEventHandler):
             wx.CallAfter(self.frame.process_new_file, event.src_path)
 
 
+# & -----------------  Главное окно  -----------------  #
+
+
 class MainFrame(wx.Frame):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, title="Оператор"):
         wx.Frame.__init__(
             self,
             parent,
@@ -200,16 +203,33 @@ class MainFrame(wx.Frame):
         # Привязка обработчиков событий
         self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
         # self.updateButton.Bind(wx.EVT_BUTTON, self.update)
-        self.journalButton.Bind(wx.EVT_BUTTON, self.journal_frame)
+        self.journalButton.Bind(wx.EVT_BUTTON, self.to_journal_frame)
         self.datePicker.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_change)
 
         return buttonSizer
 
-    def journal_frame(self, event):
-        journal = JournalFrame
+    def to_journal_frame(self, event):
+        self.journal = JournalFrame(None)
+        self.journal.Show()
+
+    def to_login_frame(self, event):
+        self.journal = LoginFrame(None)
+        self.journal.Show()
+
+    def setup_colors(self):
+        """Настройка цветовой схемы"""
+        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.SetBackgroundColour(bg_color)
+
+        # Настройка таблицы
+        self.logGrid.SetBackgroundColour(bg_color)
+        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
+        self.logGrid.SetLabelBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        )
 
     def UI(self):
-        """Создаёт и размещает основные сайзеры."""
+        """Создание интерфейса"""
         mainSizer = wx.BoxSizer(wx.VERTICAL)
 
         # Верхний сайзер (изображение + лог панель)
@@ -240,29 +260,13 @@ class MainFrame(wx.Frame):
         # Загрузка данных в таблицу
         self.load_data_from_db()
 
-    def setup_colors(self):
-        """Настройка цветовой схемы"""
-        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        self.SetBackgroundColour(bg_color)
+    # & -----------------       Лог     -----------------  #
 
-        # Настройка таблицы
-        self.logGrid.SetBackgroundColour(bg_color)
-        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
-        self.logGrid.SetLabelBackgroundColour(
-            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
-        )
-
-    # & -----------------  Обработчики  -----------------  #
-
-    # & -----------------  Лог  -----------------  #
-
-    # Текстовый поток
     def log_message(self, message):
         wx.CallAfter(self.logPanel.AppendText, message)
 
-        # & -----------------  Распознование  ---------------  #
+    # & -----------------  Распознование  ---------------  #
 
-    # Загрузка моделей
     def download_models(self):
         threading.Thread(target=self.download_task, daemon=True).start()
 
@@ -280,7 +284,6 @@ class MainFrame(wx.Frame):
         except Exception as e:
             wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
 
-    # Наблюдение за папкой
     def start_file_watcher(self):
         """Запуск наблюдателя за папкой plates"""
         path = "./plates"
@@ -361,7 +364,7 @@ class MainFrame(wx.Frame):
             cursor.close()
             conn.close()
 
-        # & -----------------  Изображение  -----------------  #
+    # & -----------------  Изображение  -----------------  #
 
     def show_image(self, img):
         """Отображает изображение в интерфейсе с масштабированием"""
@@ -395,9 +398,8 @@ class MainFrame(wx.Frame):
             # Отображение изображения
             wx.CallAfter(self.IMG.SetBitmap, wx.Bitmap(wx_img))
 
-        # & -----------------  Журнал  -----------------  #
+    # & -----------------     Журнал     ----------------  #
 
-    # Динамическое обновление журнала
     def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
         """Обработчик на изменение даты"""
         # Получить объект wx.DateTime
@@ -408,12 +410,10 @@ class MainFrame(wx.Frame):
 
         self.load_data_from_db(date)
 
-    # Динамическое обновление столбцов
     def update_grid(self):
         """Обновляет размеры столбцов после добавления данных."""
         self.logGrid.AutoSizeColumns()
 
-    # Подгрузка журнала
     def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
         """Загружает данные из PostgreSQL в таблицу"""
         try:
@@ -521,12 +521,10 @@ class MainFrame(wx.Frame):
             cursor.close()
             conn.close()
 
-    # Обновление журнала
-    # def update(self, event):
-    #     """Обновление журнала без полной перезагрузки таблицы"""
-    #     pass
+    def update(self, event):
+        """Обновление журнала без полной перезагрузки таблицы"""
+        pass
 
-    # Выгрузка журнала
     def export_to_excel(self, event):
         """Экспорт данных в Excel"""
         dlg = wx.TextEntryDialog(
@@ -581,7 +579,7 @@ class MainFrame(wx.Frame):
 
         dlg.Destroy()
 
-        # & -----------------  Свои функции  -----------------  #
+    # & -----------------  Свои функции  -----------------  #
 
     def download(self):
         try:
@@ -723,20 +721,393 @@ class MainFrame(wx.Frame):
         pass
 
 
+# & -----------------  Окно журнала  -----------------  #
+
+
 class JournalFrame(wx.Frame):
-    def __init__(self, parent):
-        super().__init__(parent, title="Журнал", size=(400, 300))
-        panel = wx.Panel(self)
+    def __init__(self, parent, title="Журнал"):
+        wx.Frame.__init__(
+            self,
+            parent,
+            id=wx.ID_ANY,
+            title=wx.EmptyString,
+            pos=wx.DefaultPosition,
+            size=wx.Size(500, 400),
+            style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL,
+        )
+
+        self.SetSizeHints(wx.Size(800, 600), wx.DefaultSize)
+
+        # Устанавливаем иконку
+        self.SetIcon(wx.Icon("docs/app_icon.ico", wx.BITMAP_TYPE_ICO))
+
+        # Создание основного макета
+        self.UI()
+        self.Centre(wx.BOTH)
 
         # Кнопка закрытия
-        close_btn = wx.Button(panel, label="Закрыть", pos=(150, 100))
-        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        # close_btn = wx.Button(panel, label="Закрыть", pos=(150, 100))
+        # close_btn.Bind(wx.EVT_BUTTON, self.on_close)
 
         self.Centre()
         self.Show()
 
+    def create_grid_panel(self, parent):
+        """Создаёт панель для таблицы логов и добавляет кнопку экспорта."""
+        panel = wx.BoxSizer(wx.VERTICAL)
+        self.logGrid = wx.grid.Grid(
+            parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0
+        )
+
+        # Настройка цветов
+        self.setup_colors()
+
+        # Настройка таблицы
+        self.logGrid.CreateGrid(5, 4)
+        self.logGrid.SetColLabelValue(0, "Машина")
+        self.logGrid.SetColLabelValue(1, "Водитель")
+        self.logGrid.SetColLabelValue(2, "Время прохождения КПП")
+        self.logGrid.SetColLabelValue(3, "Статус")
+
+        self.logGrid.EnableEditing(True)
+        self.logGrid.EnableGridLines(True)
+        self.logGrid.EnableDragGridSize(False)
+        self.logGrid.SetMargins(0, 0)
+
+        # Настройки столбцов
+        self.logGrid.EnableDragColMove(False)
+        self.logGrid.EnableDragColSize(True)
+        self.logGrid.SetColLabelAlignment(wx.ALIGN_CENTER, wx.ALIGN_CENTER)
+
+        # Настройки строк
+        self.logGrid.EnableDragRowSize(True)
+        self.logGrid.SetRowLabelAlignment(wx.ALIGN_CENTER, wx.ALIGN_CENTER)
+
+        # Выравнивание ячеек
+        self.logGrid.SetDefaultCellAlignment(wx.ALIGN_LEFT, wx.ALIGN_TOP)
+        panel.Add(self.logGrid, 1, wx.EXPAND | wx.ALL, 5)
+
+        # Автоматическое подстраивание ширины столбцов
+        self.logGrid.AutoSizeColumns()
+
+        # Добавление панели кнопок под таблицу
+        panel.Add(self.create_buttons_panel(parent), 0, wx.EXPAND, 5)
+
+        return panel
+
+    def create_buttons_panel(self, parent):
+        """Создаёт панель с кнопкой 'Экспорт' и 'Дата'."""
+        buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Кнопка экспорт
+        self.exportButton = wx.Button(parent, wx.ID_ANY, "Экспорт в Excel")
+        buttonSizer.Add(self.exportButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # Разделитель между кнопками
+        buttonSizer.AddSpacer(10)
+
+        # Кнопка выбора даты
+        self.datePicker = wx.adv.DatePickerCtrl(
+            self,
+            wx.ID_ANY,
+            wx.DefaultDateTime,
+            wx.DefaultPosition,
+            wx.DefaultSize,
+            style=wx.adv.DP_DROPDOWN | wx.adv.DP_SHOWCENTURY,
+        )
+        buttonSizer.Add(self.datePicker, 0, wx.ALL, 5)
+
+        # Установить текущую дату
+        self.datePicker.SetValue(wx.DateTime.Now())
+
+        # Установить минимальную и максимальную даты
+        min_date = wx.DateTime()
+        min_date.ParseDate("2025-01-01")
+
+        max_date = wx.DateTime()
+        max_date.ParseDate("2025-12-31")
+
+        # Можно выбрать даты только в 2025 году
+        self.datePicker.SetRange(min_date, max_date)
+
+        # Привязка обработчиков событий
+        self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
+        # self.updateButton.Bind(wx.EVT_BUTTON, self.update)
+        self.datePicker.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_change)
+
+        return buttonSizer
+
+    def setup_colors(self):
+        """Настройка цветовой схемы"""
+        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.SetBackgroundColour(bg_color)
+
+        # Настройка таблицы
+        self.logGrid.SetBackgroundColour(bg_color)
+        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
+        self.logGrid.SetLabelBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        )
+
+    def UI(self):
+        """Создаёт интерфейс."""
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Верхний сайзер (изображение + лог панель)
+        highSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Нижний сайзер (таблица логов + кнопка)
+        downSizer = wx.BoxSizer(wx.VERTICAL)
+        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
+
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
+        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
+
+    def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
+        """Обработчик на изменение даты"""
+        # Получить объект wx.DateTime
+        current_date = self.datePicker.GetValue()
+
+        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
+        date = current_date.FormatISODate()  # Пример: "2025-03-12"
+
+        self.load_data_from_db(date)
+
+    def update_grid(self):
+        """Обновляет размеры столбцов после добавления данных."""
+        self.logGrid.AutoSizeColumns()
+
+    def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
+        """Загружает данные из PostgreSQL в таблицу"""
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
+
+            # Запрос данных
+            query = """
+            SELECT
+            CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
+            CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
+            l.transittime,
+            CASE WHEN transittype THEN 'Заехал' 
+            ELSE 'Выехал' 
+            END AS status
+            FROM "log" AS l
+            JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+            JOIN "driver" AS d ON v.id_driver = d.id_driver
+            WHERE l.transittime::date = %s
+            ORDER BY l.transittime DESC
+            LIMIT 50
+            """
+            cursor.execute(query, (date,))
+            rows = cursor.fetchall()
+
+            # Очистка сетки перед обновлением
+            self.logGrid.ClearGrid()
+            if self.logGrid.GetNumberRows() > 0:
+                self.logGrid.DeleteRows(0, self.logGrid.GetNumberRows())
+
+            # Получаем текущее количество строк в таблице wx.Grid
+            current_rows = self.logGrid.GetNumberRows()
+
+            # Если в БД больше строк, чем в Grid, добавляем недостающие
+            if len(rows) > current_rows:
+                self.logGrid.AppendRows(len(rows) - current_rows)
+
+            # Обновляем данные в wx.Grid
+            for row_index, row in enumerate(rows):
+                for col_index, value in enumerate(row):
+                    self.logGrid.SetCellValue(row_index, col_index, str(value))
+
+            # Если в Grid больше строк, чем в БД, удаляем лишние
+            if len(rows) < current_rows:
+                self.logGrid.DeleteRows(len(rows), current_rows - len(rows))
+
+            cursor.close()
+            conn.close()
+
+            # Автоматическое подстраивание колонок после добавления данных
+            self.update_grid()
+
+        except Exception as e:
+            wx.MessageBox(f"ОШИБКА ЗАГРУЗКИ ДАННЫХ: {e}", "Ошибка", wx.ICON_ERROR)
+        finally:
+            cursor.close()
+            conn.close()
+
+    def export_to_excel(self, event):
+        """Экспорт данных в Excel"""
+        dlg = wx.TextEntryDialog(
+            self, "Введите количество строк для выгрузки:", "Выгрузка в Excel"
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            try:
+                row_count = int(dlg.GetValue())
+
+                # Подключение к БД
+                conn = psycopg2.connect(
+                    host=DB_HOST,
+                    port=DB_PORT,
+                    dbname=DB_NAME,
+                    user=DB_USER,
+                    password=DB_PASSWORD,
+                )
+
+                # Запрос
+                query = f"""
+                SELECT
+                CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
+                CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
+                l.transittime,
+                CASE WHEN transittype THEN 'Заехал' 
+                ELSE 'Выехал' 
+                END AS status
+                FROM "log" AS l
+                JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+                JOIN "driver" AS d ON v.id_driver = d.id_driver
+                ORDER BY l.transittime DESC
+                LIMIT {row_count}
+                """
+                df = pd.read_sql(query, conn)  # Pandas DataFrame (df)
+                conn.close()
+
+                # Сохранение Excel на рабочем столе
+                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+                output_file = os.path.join(desktop_path, "logbook_export.xlsx")
+
+                df.to_excel(output_file, index=False)
+                wx.MessageBox(
+                    f"Данные успешно выгружены в Excel:\n{output_file}",
+                    "Успех",
+                    wx.ICON_INFORMATION,
+                )
+
+            except Exception as e:
+                wx.MessageBox(f"ОШИБКА ЭКСПОРТА: {e}", "Ошибка", wx.ICON_ERROR)
+            finally:
+                conn.close()
+
+        dlg.Destroy()
+
     def on_close(self, event):
         self.Destroy()  # Закрыть только второе окно
+
+
+# & -----------------  Окно авторизации  -----------------  #
+
+
+class LoginFrame(wx.Dialog):
+    def __init__(self, parent, title="Авторизация"):
+        super(LoginFrame, self).__init__(parent, title=title, size=(300, 200))
+
+        self.InitUI()
+        self.Centre()
+
+    def GetLoginData(self):
+        """Возвращает введенные данные логина"""
+        return self.txt_login.GetValue()
+
+    def GetPasswordData(self):
+        """Возвращает введенные данные пароля"""
+        return self.txt_password.GetValue()
+
+    def InitUI(self):
+        """UI интерфейс"""
+        panel = wx.Panel(self)
+
+        # Создаем элементы управления
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        # Логин
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        lbl_login = wx.StaticText(panel, label="Логин:")
+        hbox1.Add(lbl_login, flag=wx.RIGHT, border=8)
+        self.txt_login = wx.TextCtrl(panel)
+        hbox1.Add(self.txt_login, proportion=1)
+        vbox.Add(
+            hbox1,
+            flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
+            border=10,
+            proportion=0,
+        )
+
+        vbox.Add((-1, 10))  # Пустое пространство
+
+        # Пароль
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        lbl_password = wx.StaticText(panel, label="Пароль:")
+        hbox2.Add(lbl_password, flag=wx.RIGHT, border=8)
+        self.txt_password = wx.TextCtrl(panel, style=wx.TE_PASSWORD)
+        hbox2.Add(self.txt_password, proportion=1)
+        vbox.Add(hbox2, flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10, proportion=0)
+
+        vbox.Add((-1, 20))  # Пустое пространство
+
+        # Кнопки
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        btn_ok = wx.Button(panel, label="Войти", id=wx.ID_OK)
+        btn_ok.SetDefault()
+        btn_cancel = wx.Button(panel, label="Отмена", id=wx.ID_CANCEL)
+        hbox3.Add(btn_ok)
+        hbox3.Add(btn_cancel, flag=wx.LEFT, border=5)
+        vbox.Add(hbox3, flag=wx.ALIGN_CENTER | wx.BOTTOM, border=10)
+
+        panel.SetSizer(vbox)
+
+        # Привязываем события
+        btn_ok.Bind(wx.EVT_BUTTON, self.OnLogin)
+        btn_cancel.Bind(wx.EVT_BUTTON, self.OnCancel)
+
+    def OnLogin(self, event):
+        """При авторизации"""
+        # Подключение к БД
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+        )
+        cursor = conn.cursor()
+
+        # Здесь можно добавить проверку логина и пароля
+        if not self.txt_login.GetValue():
+            wx.MessageBox("Введите логин и пароль", "Ошибка", wx.OK | wx.ICON_ERROR)
+            return
+
+        if not self.txt_password.GetValue():
+            wx.MessageBox("Введите логин и пароль", "Ошибка", wx.OK | wx.ICON_ERROR)
+            return
+
+        query = """
+        SELECT * FROM private.account
+            ORDER BY login ASC 
+        """
+
+        # Параметр передается как кортеж с одним элементом
+        cursor.execute(query, (hash(self.GetLoginData()), hash(self.GetPasswordData())))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+    def OnCancel(self, event):
+        """При нажатии отмена"""
+        self.EndModal(wx.ID_CANCEL)
 
 
 if __name__ == "__main__":
