@@ -42,11 +42,11 @@
 
 4.Импортируйте струтктуру БД на свой сервер.
     -Таблица driver
-    ![alt text](image-1.png)
+    ![alt text](docs/image-1.png)
     -Таблица log
-    ![alt text](image-2.png)
+    ![alt text](docs/image-2.png)
     -Таблица vehicle
-    ![alt text](image-3.png)
+    ![alt text](docs/image-3.png)
 
 ---
 
@@ -64,7 +64,7 @@
 
 3. После запуска откроется графическое окно приложения.
 
-    ![alt text](image.png)
+    ![alt text](docs/image.png)
 
 ---
 
