@@ -1,6 +1,6 @@
 # Number Plate Recognition
 
-[![ru](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README-ru.md)
+[![ru](https://img.shields.io/badge/lang-ru-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README-ru.md)
 
 This project is designed for the automatic recognition of number plates from images and to check whether a vehicle is allowed entry based on a list of registered numbers.
 
