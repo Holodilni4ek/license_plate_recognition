@@ -40,11 +40,11 @@ To run the project, the following components must be installed:
 
 4. Import the database structure to your server.
     - Table driver
-    ![alt text](image-1.png)
+    ![alt text](docs/image-1.png)
     - Table log
-    ![alt text](image-2.png)
+    ![alt text](docs/image-2.png)
     - Table vehicle
-    ![alt text](image-3.png)
+    ![alt text](docs/image-3.png)
 
 ---
 
@@ -62,7 +62,7 @@ To run the project, the following components must be installed:
 
 3. After launching, a graphical window of the application will open.
 
-    ![alt text](image.png)
+    ![alt text](docs/image.png)
 
 ---
 
