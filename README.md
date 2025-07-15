@@ -31,19 +31,14 @@ To run the project, the following components must be installed:
    git clone https://github.com/RecognitionVLT.git
    cd RecognitionVLT
 
-2. Install the required dependencies:
-
-    ```bash
-    pip install -r requirements.txt
-
-3. Install the necessary libraries:
+2. Install the necessary libraries:
 
     ```bash
     pip install wxPython tensorflow opencv-python scikit-image matplotlib requests gdown watchdog numpy
 
-4. You can install PostgreSQL from their official website. [a link](https://www.postgresql.org/)
+3. You can install PostgreSQL from their official website. [a link](https://www.postgresql.org/)
 
-5. Import the database structure to your server.
+4. Import the database structure to your server.
     - Table driver
     ![alt text](image-1.png)
     - Table log

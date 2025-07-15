@@ -31,19 +31,14 @@
    git clone https://github.com/RecognitionVLT.git
    cd RecognitionVLT
 
-2. Установите необходимые зависимости:
-
-    ```bash
-    pip install -r requirements.txt
-
-3. Установите необходимые библиотеки:
+2. Установите необходимые библиотеки:
 
     ```bash
     pip install wxPython tensorflow opencv-python scikit-image matplotlib requests gdown watchdog numpy
 
-4. Установить PostgreSQL вы можете с их официального сайта.[a link](https://www.postgresql.org/)
+3. Установить PostgreSQL вы можете с их официального сайта.[a link](https://www.postgresql.org/)
 
-5.Импортируйте струтктуру БД на свой сервер.
+4.Импортируйте струтктуру БД на свой сервер.
     -Таблица driver
     ![alt text](image-1.png)
     -Таблица log
