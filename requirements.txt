@@ -1,9 +1,0 @@
-wxPython
-tensorflow
-opencv-python
-scikit-image
-matplotlib
-requests
-gdown
-watchdog
-numpy
