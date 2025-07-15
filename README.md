@@ -45,17 +45,17 @@ To run the application, the following components must be installed:
 4. Import the database to your server.
 
     - Table **driver** \
-    ![alt text](docs/image-1.png)
+    ![alt text](docs/IMG_table_driver.png)
 
     - Table **log** \
-    ![alt text](docs/image-2.png)
+    ![alt text](docs/IMG_table_log.png)
 
     - Table **vehicle** \
-    ![alt text](docs/image-3.png)
+    ![alt text](docs/IMG_table_vehicle.png)
 
 5. Database structure
 
-    ![alt text](docs/image.png)
+    ![alt text](docs/IMG_ERD.png)
 
 ---
 
@@ -75,7 +75,7 @@ To run the application, the following components must be installed:
 
 3. After launching, a graphical window of the application will open.
 
-    ![alt text](docs/image.png)
+    ![alt text](docs/IMG_window.png)
 
 4. **Recognition:** \
     The application will automatically start recognition as soon as a new image is added to the **plates** folder.\

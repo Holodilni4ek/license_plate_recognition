@@ -83,7 +83,7 @@ class MainFrame(wx.Frame):
         self.SetSizeHints(wx.Size(800, 600), wx.DefaultSize)
 
         # Устанавливаем иконку
-        self.SetIcon(wx.Icon("app_icon.ico", wx.BITMAP_TYPE_ICO))
+        self.SetIcon(wx.Icon("docs/app_icon.ico", wx.BITMAP_TYPE_ICO))
 
         # Создание основного макета
         self.UI()

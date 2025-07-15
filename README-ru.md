@@ -43,17 +43,17 @@
 4. Импортируйте БД на свой сервер.
 
     - Таблица **driver** \
-    ![alt text](docs/image-1.png)
+    ![alt text](docs/IMG_table_driver.png)
 
     - Таблица **log** \
-    ![alt text](docs/image-2.png)
+    ![alt text](docs/IMG_table_log.png)
 
     - Таблица **vehicle** \
-    ![alt text](docs/image-3.png)
+    ![alt text](docs/IMG_table_vehicle.png)
 
 5. Структура БД.
 
-    ![alt text](docs/image.png)
+    ![alt text](docs/IMG_ERD.png)
 
 ---
 
@@ -71,7 +71,7 @@
 
 3. После запуска откроется графическое окно приложения.
 
-    ![alt text](docs/image.png)
+    ![alt text](docs/IMG_window.png)
 
 4. **Распознавание:** \
     Приложение автоматически начнет распознавание, как только в папку **plates** будет добавлено новое изображение.\
