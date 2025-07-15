@@ -1,6 +1,6 @@
 # Number Plate Recognition
 
-[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README.md)
+[![ru](https://img.shields.io/badge/lang-ru-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README-ru.md)
 
 **The application is designed for the automatic recognition of number plates from images and checking whether a vehicle is permitted to enter based on a list of registered numbers.**
 
@@ -44,13 +44,13 @@ To run the application, the following components must be installed:
 
 4. Import the database to your server.
 
-    - Table **driver**
+    - Table **driver** \
     ![alt text](docs/image-1.png)
 
-    - Table **log**
+    - Table **log** \
     ![alt text](docs/image-2.png)
 
-    - Table **vehicle**
+    - Table **vehicle** \
     ![alt text](docs/image-3.png)
 
 5. Database structure
@@ -77,7 +77,7 @@ To run the application, the following components must be installed:
 
     ![alt text](docs/image.png)
 
-4. Recognition:
+4. **Recognition:** \
     The application will automatically start recognition as soon as a new image is added to the **plates** folder.\
     The recognition results will be displayed in the text field of the application:\
     If the number is found in the database, a message will appear: *Entry permitted*.\
