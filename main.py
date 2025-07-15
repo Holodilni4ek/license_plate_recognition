@@ -2,10 +2,12 @@ import itertools
 import os
 import sys
 import threading
+from functools import cache
 
 import cv2
 import gdown
 import numpy as np
+import openpyxl
 import pandas as pd
 import psycopg2
 import requests
@@ -25,15 +27,24 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 
-TF_ENABLE_ONEDNN_OPTS = 0
-
-
 load_dotenv(".env")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+
+# ^         ОШИБКИ
+# ^
+# ^ ОШИБКА ЗАГРУЗКИ МОДЕЛИ       -> download_task
+# ^ ОШИБКА РАСПОЗНАВАНИЯ         -> recognition_task
+# ^ ОШИБКА ПРОВЕРКИ НОМЕРА       -> is_number_registered
+# ^ ОШИБКА ЗАГРУЗКИ ДАННЫХ       -> load_data_from_db
+# ^ ОШИБКА ДОБАВЛЕНИЯ В ЖУРНАЛ   -> load_data_to_db
+# ^ ОШИБКА ЭКСПОРТА              -> export_to_excel
+# ^ ОШИБКА ПОДКЛЮЧЕНИЯ К СЕТИ    -> download
+# ^ ОШИБКА РАСПОЗНОВАНИЯ         -> recognition
 
 
 class RedirectText:
@@ -57,8 +68,7 @@ class FileWatcher(FileSystemEventHandler):
             wx.CallAfter(self.frame.process_new_file, event.src_path)
 
 
-class LicensePlateRecognitionApp(wx.Frame):
-
+class MainFrame(wx.Frame):
     def __init__(self, parent=None):
         wx.Frame.__init__(
             self,
@@ -76,7 +86,7 @@ class LicensePlateRecognitionApp(wx.Frame):
         self.SetIcon(wx.Icon("app_icon.ico", wx.BITMAP_TYPE_ICO))
 
         # Создание основного макета
-        self.create_main_layout()
+        self.UI()
         self.Centre(wx.BOTH)
 
     def create_img_panel(self, parent):
@@ -152,12 +162,16 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Разделитель между кнопками
         buttonSizer.AddSpacer(10)
 
+        # Кнопка полного журнала
+        self.journalButton = wx.Button(parent, wx.ID_ANY, "Открыть журнал")
+        buttonSizer.Add(self.journalButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
         # # Кнопка обновить
         # self.updateButton = wx.Button(parent, wx.ID_ANY, "Обновить")
         # buttonSizer.Add(self.updateButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
-        # # Разделитель между кнопками
-        # buttonSizer.AddSpacer(10)
+        # Разделитель между кнопками
+        buttonSizer.AddSpacer(10)
 
         # Кнопка выбора даты
         self.datePicker = wx.adv.DatePickerCtrl(
@@ -186,11 +200,15 @@ class LicensePlateRecognitionApp(wx.Frame):
         # Привязка обработчиков событий
         self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
         # self.updateButton.Bind(wx.EVT_BUTTON, self.update)
+        self.journalButton.Bind(wx.EVT_BUTTON, self.journal_frame)
         self.datePicker.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_change)
 
         return buttonSizer
 
-    def create_main_layout(self):
+    def journal_frame(self, event):
+        journal = JournalFrame
+
+    def UI(self):
         """Создаёт и размещает основные сайзеры."""
         mainSizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -242,7 +260,7 @@ class LicensePlateRecognitionApp(wx.Frame):
     def log_message(self, message):
         wx.CallAfter(self.logPanel.AppendText, message)
 
-    # & -----------------  Распознование  ---------------  #
+        # & -----------------  Распознование  ---------------  #
 
     # Загрузка моделей
     def download_models(self):
@@ -252,7 +270,7 @@ class LicensePlateRecognitionApp(wx.Frame):
         """Фоновая загрузка моделей"""
         try:
             wx.CallAfter(self.log_message, "Поиск моделей...\n")
-            self.Download()
+            self.download()
             if not all(
                 os.path.isfile(f)
                 for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
@@ -298,7 +316,7 @@ class LicensePlateRecognitionApp(wx.Frame):
                 )
 
             # Запуск распознавания
-            recognized_number = self.Recognition(file_path, self)
+            recognized_number = self.recognition(file_path, self)
             if recognized_number:
                 wx.CallAfter(
                     self.log_message, f"Распознанный номер: {recognized_number}\n"
@@ -343,7 +361,7 @@ class LicensePlateRecognitionApp(wx.Frame):
             cursor.close()
             conn.close()
 
-    # & -----------------  Изображение  -----------------  #
+        # & -----------------  Изображение  -----------------  #
 
     def show_image(self, img):
         """Отображает изображение в интерфейсе с масштабированием"""
@@ -377,7 +395,7 @@ class LicensePlateRecognitionApp(wx.Frame):
             # Отображение изображения
             wx.CallAfter(self.IMG.SetBitmap, wx.Bitmap(wx_img))
 
-    # & -----------------  Журнал  -----------------  #
+        # & -----------------  Журнал  -----------------  #
 
     # Динамическое обновление журнала
     def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
@@ -419,7 +437,7 @@ class LicensePlateRecognitionApp(wx.Frame):
             ELSE 'Выехал' 
             END AS status
             FROM "log" AS l
-			JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+            JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
             JOIN "driver" AS d ON v.id_driver = d.id_driver
             WHERE l.transittime::date = %s
             ORDER BY l.transittime DESC
@@ -537,7 +555,7 @@ class LicensePlateRecognitionApp(wx.Frame):
                 ELSE 'Выехал' 
                 END AS status
                 FROM "log" AS l
-				JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
+                JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
                 JOIN "driver" AS d ON v.id_driver = d.id_driver
                 ORDER BY l.transittime DESC
                 LIMIT {row_count}
@@ -563,9 +581,9 @@ class LicensePlateRecognitionApp(wx.Frame):
 
         dlg.Destroy()
 
-    # & -----------------  Свой функции  -----------------  #
+        # & -----------------  Свои функции  -----------------  #
 
-    def Download(self):
+    def download(self):
         try:
             if not os.path.isfile("model_resnet.tflite"):
                 print("Загрузка model_resnet.tflite...")
@@ -583,9 +601,9 @@ class LicensePlateRecognitionApp(wx.Frame):
                     quiet=True,
                 )
         except requests.exceptions.RequestException as e:
-            raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К ИНТЕРНЕТ: {str(e)}")
+            raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К СЕТИ: {str(e)}")
 
-    def DecodeBatch(self, out):
+    def decode_batch(self, out):
         letters = "0 1 2 3 4 5 6 7 8 9 A B C E H K M O P T X Y".split()
         ret = []
         for j in range(out.shape[0]):
@@ -595,7 +613,7 @@ class LicensePlateRecognitionApp(wx.Frame):
             ret.append(outstr)
         return ret
 
-    def Recognition(self, file_path, frame):
+    def recognition(self, file_path, frame):
         try:
             modelRecPath = "model_resnet.tflite"
             modelPath = "model_number_recognition.tflite"
@@ -689,7 +707,7 @@ class LicensePlateRecognitionApp(wx.Frame):
                 interpreter.set_tensor(input_details[0]["index"], X_data1)
                 interpreter.invoke()
                 net_out_value = interpreter.get_tensor(output_details[0]["index"])
-                pred_texts = self.DecodeBatch(net_out_value)
+                pred_texts = self.decode_batch(net_out_value)
 
                 # Возврат распознанного номера
                 return pred_texts[0] if pred_texts else None
@@ -705,8 +723,24 @@ class LicensePlateRecognitionApp(wx.Frame):
         pass
 
 
+class JournalFrame(wx.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, title="Журнал", size=(400, 300))
+        panel = wx.Panel(self)
+
+        # Кнопка закрытия
+        close_btn = wx.Button(panel, label="Закрыть", pos=(150, 100))
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+
+        self.Centre()
+        self.Show()
+
+    def on_close(self, event):
+        self.Destroy()  # Закрыть только второе окно
+
+
 if __name__ == "__main__":
-    app = wx.App()
-    frame = LicensePlateRecognitionApp()
+    app = wx.App(False)
+    frame = MainFrame()
     frame.Show()
     app.MainLoop()
