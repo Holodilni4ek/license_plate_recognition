@@ -41,12 +41,12 @@
 3. Установить PostgreSQL вы можете с их официального сайта.[a link](https://www.postgresql.org/)
 
 4.Импортируйте струтктуру БД на свой сервер.
-    -Таблица driver
-    ![alt text](docs/image-1.png)
-    -Таблица log
-    ![alt text](docs/image-2.png)
-    -Таблица vehicle
-    ![alt text](docs/image-3.png)
+    - Таблица driver
+        ![alt text](docs/image-1.png)
+    - Таблица log
+        ![alt text](docs/image-2.png)
+    - Таблица vehicle
+        ![alt text](docs/image-3.png)
 
 ---
 
