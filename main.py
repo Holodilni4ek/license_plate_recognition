@@ -1,3 +1,4 @@
+import hashlib as hash_
 import itertools
 import os
 import sys
@@ -84,16 +85,62 @@ class MainFrame(wx.Frame):
         )
 
         self.SetSizeHints(wx.Size(800, 600), wx.DefaultSize)
+        self.Centre(wx.BOTH)
 
         # Устанавливаем иконку
         self.SetIcon(wx.Icon("docs/app_icon.ico", wx.BITMAP_TYPE_ICO))
 
         # Создание основного макета
-        self.UI()
-        self.Centre(wx.BOTH)
+        self.create_ui()
+
+        dlg = LoginFrame(None)
+        dlg.ShowModal()
+        authenticated = dlg.logged_in
+        dlg.Destroy()
+        if not authenticated:
+            self.Close()
+
+        self.Show()
+
+    def create_ui(self):
+        """Создает интерфейс"""
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Верхний сайзер (изображение + лог панель)
+        highSizer = wx.BoxSizer(wx.HORIZONTAL)
+        highSizer.Add(self.create_img_panel(self), 1, wx.EXPAND, 5)
+        highSizer.Add(self.create_log_panel(self), 1, wx.EXPAND, 5)
+
+        # Средний сайзер (таблица журнала)
+        midSizer = wx.BoxSizer(wx.VERTICAL)
+        midSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
+
+        # Нижний сайзер (кнопки)
+        downSizer = wx.BoxSizer(wx.VERTICAL)
+        downSizer.Add(self.create_buttons_panel(self), 0, wx.EXPAND, 5)
+
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 15, wx.EXPAND, 5)
+        mainSizer.Add(midSizer, 15, wx.EXPAND, 5)
+        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+        # Перенаправление вывода
+        sys.stdout = RedirectText(self.logPanel)
+
+        # Загрузка моделей
+        self.download_models()
+
+        # Запуск наблюдателя за папкой
+        self.start_file_watcher()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
 
     def create_img_panel(self, parent):
-        """Создаёт панель для изображения."""
+        """Создает панель для изображения."""
         panel = wx.BoxSizer(wx.VERTICAL)
         self.IMG = wx.StaticBitmap(
             parent, wx.ID_ANY, wx.NullBitmap, wx.DefaultPosition, wx.DefaultSize, 0
@@ -102,7 +149,7 @@ class MainFrame(wx.Frame):
         return panel
 
     def create_log_panel(self, parent):
-        """Создаёт панель для логов и добавляет кнопку экспорта."""
+        """Создает панель для логов."""
         panel = wx.BoxSizer(wx.VERTICAL)
         self.logPanel = wx.TextCtrl(
             parent, wx.ID_ANY, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2
@@ -112,8 +159,8 @@ class MainFrame(wx.Frame):
         return panel
 
     def create_grid_panel(self, parent):
-        """Создаёт панель для таблицы логов и добавляет кнопку экспорта."""
-        panel = wx.BoxSizer(wx.VERTICAL)
+        """Создает панель для таблицы журнала."""
+        panel = wx.FlexGridSizer(wx.VERTICAL)
         self.logGrid = wx.grid.Grid(
             parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0
         )
@@ -149,13 +196,10 @@ class MainFrame(wx.Frame):
         # Автоматическое подстраивание ширины столбцов
         self.logGrid.AutoSizeColumns()
 
-        # Добавление панели кнопок под таблицу
-        panel.Add(self.create_buttons_panel(parent), 0, wx.EXPAND, 5)
-
         return panel
 
     def create_buttons_panel(self, parent):
-        """Создаёт панель с кнопками 'Экспорт' и 'Обновить'."""
+        """Создает панель с кнопками 'Экспорт', 'Обновить', 'Выбора даты' и 'Журнал'."""
         buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Кнопка экспорт
@@ -208,14 +252,6 @@ class MainFrame(wx.Frame):
 
         return buttonSizer
 
-    def to_journal_frame(self, event):
-        self.journal = JournalFrame(None)
-        self.journal.Show()
-
-    def to_login_frame(self, event):
-        self.journal = LoginFrame(None)
-        self.journal.Show()
-
     def setup_colors(self):
         """Настройка цветовой схемы"""
         bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
@@ -228,37 +264,10 @@ class MainFrame(wx.Frame):
             wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
         )
 
-    def UI(self):
-        """Создание интерфейса"""
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Верхний сайзер (изображение + лог панель)
-        highSizer = wx.BoxSizer(wx.HORIZONTAL)
-        highSizer.Add(self.create_img_panel(self), 1, wx.EXPAND, 5)
-        highSizer.Add(self.create_log_panel(self), 1, wx.EXPAND, 5)
-
-        # Нижний сайзер (таблица логов + кнопка)
-        downSizer = wx.BoxSizer(wx.VERTICAL)
-        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
-
-        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
-        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
-        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
-
-        self.SetSizer(mainSizer)
-        self.Layout()
-
-        # Перенаправление вывода
-        sys.stdout = RedirectText(self.logPanel)
-
-        # Загрузка моделей
-        self.download_models()
-
-        # Запуск наблюдателя за папкой
-        self.start_file_watcher()
-
-        # Загрузка данных в таблицу
-        self.load_data_from_db()
+    def to_journal_frame(self, event):
+        """Открытие окна журнала"""
+        self.journal = JournalFrame(None)
+        self.journal.Show()
 
     # & -----------------       Лог     -----------------  #
 
@@ -266,23 +275,6 @@ class MainFrame(wx.Frame):
         wx.CallAfter(self.logPanel.AppendText, message)
 
     # & -----------------  Распознование  ---------------  #
-
-    def download_models(self):
-        threading.Thread(target=self.download_task, daemon=True).start()
-
-    def download_task(self):
-        """Фоновая загрузка моделей"""
-        try:
-            wx.CallAfter(self.log_message, "Поиск моделей...\n")
-            self.download()
-            if not all(
-                os.path.isfile(f)
-                for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
-            ):
-                raise Exception("Не удалось загрузить все модели")
-            wx.CallAfter(self.log_message, "Модели успешно загружены!\n")
-        except Exception as e:
-            wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
 
     def start_file_watcher(self):
         """Запуск наблюдателя за папкой plates"""
@@ -295,14 +287,32 @@ class MainFrame(wx.Frame):
         self.observer.start()
         self.log_message(f"Наблюдение за папкой {path[2:]} запущено...\n\n")
 
+    def download_models(self):
+        """Фоновая загрузка моделей"""
+        threading.Thread(target=self.download_task, daemon=True).start()
+
+    def download_task(self):
+        """Загрузка моделей"""
+        try:
+            wx.CallAfter(self.log_message, "Поиск моделей...\n")
+            self.download()
+            if not all(
+                os.path.isfile(f)
+                for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
+            ):
+                raise Exception("Не удалось загрузить все модели")
+            wx.CallAfter(self.log_message, "Модели успешно загружены!\n")
+        except Exception as e:
+            wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
+
     def process_new_file(self, file_path):
-        """Обработка нового файла"""
+        """Фоновая обработка распознавания номера"""
         threading.Thread(
             target=self.recognition_task, args=(file_path,), daemon=True
         ).start()
 
     def recognition_task(self, file_path):
-        """Фоновая обработка распознавания номера"""
+        """Распознавания номера"""
         try:
             wx.CallAfter(
                 self.log_message,
@@ -410,12 +420,16 @@ class MainFrame(wx.Frame):
 
         self.load_data_from_db(date)
 
+    def update(self, event):
+        """Обновление журнала без полной перезагрузки таблицы"""
+        pass
+
     def update_grid(self):
         """Обновляет размеры столбцов после добавления данных."""
         self.logGrid.AutoSizeColumns()
 
     def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
-        """Загружает данные из PostgreSQL в таблицу"""
+        """Загружает данные из БД в журнал"""
         try:
             # Подключение к БД
             conn = psycopg2.connect(
@@ -480,7 +494,7 @@ class MainFrame(wx.Frame):
             conn.close()
 
     def load_data_to_db(self, number):
-        """Добавление распознанной и идентифицированной машины в журнал"""
+        """Добавление распознанной машины в БД"""
         try:
             # Подключение к БД
             conn = psycopg2.connect(
@@ -520,10 +534,6 @@ class MainFrame(wx.Frame):
         finally:
             cursor.close()
             conn.close()
-
-    def update(self, event):
-        """Обновление журнала без полной перезагрузки таблицы"""
-        pass
 
     def export_to_excel(self, event):
         """Экспорт данных в Excel"""
@@ -582,6 +592,7 @@ class MainFrame(wx.Frame):
     # & -----------------  Свои функции  -----------------  #
 
     def download(self):
+        """Скачивание моделей распознования"""
         try:
             if not os.path.isfile("model_resnet.tflite"):
                 print("Загрузка model_resnet.tflite...")
@@ -602,6 +613,7 @@ class MainFrame(wx.Frame):
             raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К СЕТИ: {str(e)}")
 
     def decode_batch(self, out):
+        """Алфавит номеров"""
         letters = "0 1 2 3 4 5 6 7 8 9 A B C E H K M O P T X Y".split()
         ret = []
         for j in range(out.shape[0]):
@@ -612,6 +624,7 @@ class MainFrame(wx.Frame):
         return ret
 
     def recognition(self, file_path, frame):
+        """Распознование"""
         try:
             modelRecPath = "model_resnet.tflite"
             modelPath = "model_number_recognition.tflite"
@@ -742,7 +755,7 @@ class JournalFrame(wx.Frame):
         self.SetIcon(wx.Icon("docs/app_icon.ico", wx.BITMAP_TYPE_ICO))
 
         # Создание основного макета
-        self.UI()
+        self.create_ui()
         self.Centre(wx.BOTH)
 
         # Кнопка закрытия
@@ -752,8 +765,29 @@ class JournalFrame(wx.Frame):
         self.Centre()
         self.Show()
 
+    def create_ui(self):
+        """Создает интерфейс."""
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Верхний сайзер (изображение + лог панель)
+        highSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Нижний сайзер (таблица логов + кнопка)
+        downSizer = wx.BoxSizer(wx.VERTICAL)
+        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
+
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
+        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
+
     def create_grid_panel(self, parent):
-        """Создаёт панель для таблицы логов и добавляет кнопку экспорта."""
+        """Создает панель для таблицы журнала."""
         panel = wx.BoxSizer(wx.VERTICAL)
         self.logGrid = wx.grid.Grid(
             parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0
@@ -796,7 +830,7 @@ class JournalFrame(wx.Frame):
         return panel
 
     def create_buttons_panel(self, parent):
-        """Создаёт панель с кнопкой 'Экспорт' и 'Дата'."""
+        """Создает панель с кнопкой 'Экспорт', 'Обновить' и 'Выбора даты'."""
         buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Кнопка экспорт
@@ -849,27 +883,6 @@ class JournalFrame(wx.Frame):
             wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
         )
 
-    def UI(self):
-        """Создаёт интерфейс."""
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Верхний сайзер (изображение + лог панель)
-        highSizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        # Нижний сайзер (таблица логов + кнопка)
-        downSizer = wx.BoxSizer(wx.VERTICAL)
-        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
-
-        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
-        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
-        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
-
-        self.SetSizer(mainSizer)
-        self.Layout()
-
-        # Загрузка данных в таблицу
-        self.load_data_from_db()
-
     def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
         """Обработчик на изменение даты"""
         # Получить объект wx.DateTime
@@ -885,7 +898,7 @@ class JournalFrame(wx.Frame):
         self.logGrid.AutoSizeColumns()
 
     def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
-        """Загружает данные из PostgreSQL в таблицу"""
+        """Загружает данные из БД в таблицу"""
         try:
             # Подключение к БД
             conn = psycopg2.connect(
@@ -1014,32 +1027,24 @@ class LoginFrame(wx.Dialog):
     def __init__(self, parent, title="Авторизация"):
         super(LoginFrame, self).__init__(parent, title=title, size=(300, 200))
 
-        self.InitUI()
+        self.create_ui()
         self.Centre()
 
-    def GetLoginData(self):
-        """Возвращает введенные данные логина"""
-        return self.txt_login.GetValue()
-
-    def GetPasswordData(self):
-        """Возвращает введенные данные пароля"""
-        return self.txt_password.GetValue()
-
-    def InitUI(self):
-        """UI интерфейс"""
+    def create_ui(self):
+        """Создает интерфейс."""
         panel = wx.Panel(self)
 
         # Создаем элементы управления
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         # Логин
-        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_login = wx.StaticText(panel, label="Логин:")
-        hbox1.Add(lbl_login, flag=wx.RIGHT, border=8)
+        user_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        user_label = wx.StaticText(panel, label="Логин:")
+        user_sizer.Add(user_label, flag=wx.RIGHT, border=8)
         self.txt_login = wx.TextCtrl(panel)
-        hbox1.Add(self.txt_login, proportion=1)
+        user_sizer.Add(self.txt_login, proportion=1)
         vbox.Add(
-            hbox1,
+            user_sizer,
             flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
             border=10,
             proportion=0,
@@ -1048,31 +1053,41 @@ class LoginFrame(wx.Dialog):
         vbox.Add((-1, 10))  # Пустое пространство
 
         # Пароль
-        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_password = wx.StaticText(panel, label="Пароль:")
-        hbox2.Add(lbl_password, flag=wx.RIGHT, border=8)
+        password_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        password_label = wx.StaticText(panel, label="Пароль:")
+        password_sizer.Add(password_label, flag=wx.RIGHT, border=8)
         self.txt_password = wx.TextCtrl(panel, style=wx.TE_PASSWORD)
-        hbox2.Add(self.txt_password, proportion=1)
-        vbox.Add(hbox2, flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10, proportion=0)
+        password_sizer.Add(self.txt_password, proportion=1)
+        vbox.Add(
+            password_sizer, flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10, proportion=0
+        )
 
         vbox.Add((-1, 20))  # Пустое пространство
 
         # Кнопки
-        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
-        btn_ok = wx.Button(panel, label="Войти", id=wx.ID_OK)
-        btn_ok.SetDefault()
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button = wx.Button(panel, label="Войти", id=wx.ID_OK)
+        button.SetDefault()
         btn_cancel = wx.Button(panel, label="Отмена", id=wx.ID_CANCEL)
-        hbox3.Add(btn_ok)
-        hbox3.Add(btn_cancel, flag=wx.LEFT, border=5)
-        vbox.Add(hbox3, flag=wx.ALIGN_CENTER | wx.BOTTOM, border=10)
+        button_sizer.Add(button)
+        button_sizer.Add(btn_cancel, flag=wx.LEFT, border=5)
+        vbox.Add(button_sizer, flag=wx.ALIGN_CENTER | wx.BOTTOM, border=10)
 
         panel.SetSizer(vbox)
 
         # Привязываем события
-        btn_ok.Bind(wx.EVT_BUTTON, self.OnLogin)
-        btn_cancel.Bind(wx.EVT_BUTTON, self.OnCancel)
+        button.Bind(wx.EVT_BUTTON, self.on_login)
+        btn_cancel.Bind(wx.EVT_BUTTON, self.on_cancel)
 
-    def OnLogin(self, event):
+    def get_login_data(self):
+        """Возвращает введенные данные логина"""
+        return self.txt_login.GetValue()
+
+    def get_passwd_data(self):
+        """Возвращает введенные данные пароля"""
+        return self.txt_password.GetValue()
+
+    def on_login(self, event):
         """При авторизации"""
         # Подключение к БД
         conn = psycopg2.connect(
@@ -1084,28 +1099,54 @@ class LoginFrame(wx.Dialog):
         )
         cursor = conn.cursor()
 
-        # Здесь можно добавить проверку логина и пароля
-        if not self.txt_login.GetValue():
-            wx.MessageBox("Введите логин и пароль", "Ошибка", wx.OK | wx.ICON_ERROR)
-            return
-
-        if not self.txt_password.GetValue():
-            wx.MessageBox("Введите логин и пароль", "Ошибка", wx.OK | wx.ICON_ERROR)
-            return
-
         query = """
-        SELECT * FROM private.account
-            ORDER BY login ASC 
+        SELECT * FROM private.account WHERE login = %s
+            ORDER BY login ASC LIMIT 1
         """
 
-        # Параметр передается как кортеж с одним элементом
-        cursor.execute(query, (hash(self.GetLoginData()), hash(self.GetPasswordData())))
-        conn.commit()
+        cursor.execute(
+            query,
+            (hash_.sha256(bytes(self.get_login_data(), "utf-8")).hexdigest(),),
+        )
+
+        data = cursor.fetchone()
 
         cursor.close()
         conn.close()
 
-    def OnCancel(self, event):
+        self.logged_in = False
+
+        # Проверка логина и пароля
+        if not self.get_login_data():
+            wx.MessageBox("Введите логин", "Ошибка", wx.OK | wx.ICON_ERROR)
+            return
+
+        if not self.get_passwd_data():
+            wx.MessageBox("Введите пароль", "Ошибка", wx.OK | wx.ICON_ERROR)
+            return
+
+        # Проверка логина и пароля
+        if hash_.sha256(bytes(self.get_login_data(), "utf-8")).hexdigest() != data[0]:
+            wx.MessageBox(
+                "Пользователь с таким логином не найден",
+                "Ошибка",
+                wx.OK | wx.ICON_ERROR,
+            )
+            return
+        if hash_.sha256(bytes(self.get_passwd_data(), "utf-8")).hexdigest() != data[1]:
+            wx.MessageBox(
+                "Неправильный логин или пароль",
+                "Ошибка",
+                wx.OK | wx.ICON_ERROR,
+            )
+            return
+
+        del data
+
+        self.logged_in = True
+        self.Close()
+
+    def on_cancel(self, event):
         """При нажатии отмена"""
         self.EndModal(wx.ID_CANCEL)
 
@@ -1113,5 +1154,4 @@ class LoginFrame(wx.Dialog):
 if __name__ == "__main__":
     app = wx.App(False)
     frame = MainFrame()
-    frame.Show()
     app.MainLoop()
