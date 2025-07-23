@@ -10,3 +10,6 @@ venv/
 # python dependency
 __pycache__/
 *.pyc
+
+# docker
+.dockerignore

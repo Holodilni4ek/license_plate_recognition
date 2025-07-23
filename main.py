@@ -5,6 +5,7 @@ import sys
 import threading
 from functools import cache
 
+import ai_edge_litert  # type: ignore
 import cv2
 import gdown
 import numpy as np
@@ -12,13 +13,10 @@ import openpyxl
 import pandas as pd
 import psycopg2
 import requests
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-import tensorflow as tf
-
 import wx
 import wx.adv
 import wx.grid
+from ai_edge_litert.interpreter import Interpreter  # type: ignore
 from dotenv import load_dotenv
 from PIL import Image
 from skimage.color import rgb2gray
@@ -26,6 +24,7 @@ from skimage.feature import canny
 from skimage.transform import hough_line, hough_line_peaks, rotate
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+from ultralytics import YOLO  # type: ignore
 
 
 load_dotenv(".env")
@@ -101,43 +100,6 @@ class MainFrame(wx.Frame):
             self.Close()
 
         self.Show()
-
-    def create_ui(self):
-        """Создает интерфейс"""
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Верхний сайзер (изображение + лог панель)
-        highSizer = wx.BoxSizer(wx.HORIZONTAL)
-        highSizer.Add(self.create_img_panel(self), 1, wx.EXPAND, 5)
-        highSizer.Add(self.create_log_panel(self), 1, wx.EXPAND, 5)
-
-        # Средний сайзер (таблица журнала)
-        midSizer = wx.BoxSizer(wx.VERTICAL)
-        midSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
-
-        # Нижний сайзер (кнопки)
-        downSizer = wx.BoxSizer(wx.VERTICAL)
-        downSizer.Add(self.create_buttons_panel(self), 0, wx.EXPAND, 5)
-
-        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
-        mainSizer.Add(highSizer, 15, wx.EXPAND, 5)
-        mainSizer.Add(midSizer, 15, wx.EXPAND, 5)
-        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
-
-        self.SetSizer(mainSizer)
-        self.Layout()
-
-        # Перенаправление вывода
-        sys.stdout = RedirectText(self.logPanel)
-
-        # Загрузка моделей
-        self.download_models()
-
-        # Запуск наблюдателя за папкой
-        self.start_file_watcher()
-
-        # Загрузка данных в таблицу
-        self.load_data_from_db()
 
     def create_img_panel(self, parent):
         """Создает панель для изображения."""
@@ -268,6 +230,48 @@ class MainFrame(wx.Frame):
         """Открытие окна журнала"""
         self.journal = JournalFrame(None)
         self.journal.Show()
+
+    def to_login_frame(self, event):
+        """Открытие окна журнала"""
+        self.login = LoginFrame(None)
+        self.login.ShowModal()
+
+    def create_ui(self):
+        """Создает интерфейс"""
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Верхний сайзер (изображение + лог панель)
+        highSizer = wx.BoxSizer(wx.HORIZONTAL)
+        highSizer.Add(self.create_img_panel(self), 1, wx.EXPAND, 5)
+        highSizer.Add(self.create_log_panel(self), 1, wx.EXPAND, 5)
+
+        # Средний сайзер (таблица журнала)
+        midSizer = wx.BoxSizer(wx.VERTICAL)
+        midSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
+
+        # Нижний сайзер (кнопки)
+        downSizer = wx.BoxSizer(wx.VERTICAL)
+        downSizer.Add(self.create_buttons_panel(self), 0, wx.EXPAND, 5)
+
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 15, wx.EXPAND, 5)
+        mainSizer.Add(midSizer, 15, wx.EXPAND, 5)
+        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+        # Перенаправление вывода
+        sys.stdout = RedirectText(self.logPanel)
+
+        # Загрузка моделей
+        self.download_models()
+
+        # Запуск наблюдателя за папкой
+        self.start_file_watcher()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
 
     # & -----------------       Лог     -----------------  #
 
