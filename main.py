@@ -5,7 +5,7 @@ import sys
 import threading
 from functools import cache
 
-import ai_edge_litert  # type: ignore
+
 import cv2
 import gdown
 import numpy as np
@@ -13,10 +13,10 @@ import openpyxl
 import pandas as pd
 import psycopg2
 import requests
+import tensorflow as tf
 import wx
 import wx.adv
 import wx.grid
-from ai_edge_litert.interpreter import Interpreter  # type: ignore
 from dotenv import load_dotenv
 from PIL import Image
 from skimage.color import rgb2gray
@@ -26,6 +26,8 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 from ultralytics import YOLO  # type: ignore
 
+
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 load_dotenv(".env")
 DB_HOST = os.getenv("DB_HOST")
