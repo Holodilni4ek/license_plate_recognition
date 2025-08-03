@@ -36,6 +36,8 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
+MINDATE = "2025-01-01"
+MAXDATE = "2025-12-31"
 
 # ^ --------------------  ОШИБКИ  --------------------
 # ^
@@ -67,7 +69,7 @@ class FileWatcher(FileSystemEventHandler):
     def on_created(self, event):
         """Срабатывает при создании нового файла в папке plates"""
         if not event.is_directory:
-            wx.CallAfter(self.frame.process_new_file, event.src_path)
+            wx.CallAfter(self.frame.recognition_observe, event.src_path)
 
 
 # & -----------------  Главное окно  -----------------  #
@@ -103,7 +105,12 @@ class MainFrame(wx.Frame):
 
         self.Show()
 
-    def create_img_panel(self, parent):
+    def __del__(self):
+        pass
+
+    # & -----------------       Панели     -----------------  #
+
+    def create_img_panel(self, parent) -> wx.BoxSizer:
         """Создает панель для изображения."""
         panel = wx.BoxSizer(wx.VERTICAL)
         self.IMG = wx.StaticBitmap(
@@ -112,7 +119,7 @@ class MainFrame(wx.Frame):
         panel.Add(self.IMG, 1, wx.ALL | wx.EXPAND, 5)
         return panel
 
-    def create_log_panel(self, parent):
+    def create_log_panel(self, parent) -> wx.BoxSizer:
         """Создает панель для логов."""
         panel = wx.BoxSizer(wx.VERTICAL)
         self.logPanel = wx.TextCtrl(
@@ -122,9 +129,11 @@ class MainFrame(wx.Frame):
 
         return panel
 
-    def create_grid_panel(self, parent):
+    def create_grid_panel(self, parent) -> wx.FlexGridSizer:
         """Создает панель для таблицы журнала."""
-        panel = wx.FlexGridSizer(wx.VERTICAL)
+        panel = wx.FlexGridSizer(1, 1, 0, 0)  # 1 строка, 1 столбец
+        panel.AddGrowableRow(0)
+        panel.AddGrowableCol(0)
         self.logGrid = wx.grid.Grid(
             parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0
         )
@@ -162,7 +171,7 @@ class MainFrame(wx.Frame):
 
         return panel
 
-    def create_buttons_panel(self, parent):
+    def create_buttons_panel(self, parent) -> wx.BoxSizer:
         """Создает панель с кнопками 'Экспорт', 'Обновить', 'Выбора даты' и 'Журнал'."""
         buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -170,7 +179,6 @@ class MainFrame(wx.Frame):
         self.exportButton = wx.Button(parent, wx.ID_ANY, "Экспорт в Excel")
         buttonSizer.Add(self.exportButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
-        # Разделитель между кнопками
         buttonSizer.AddSpacer(10)
 
         # Кнопка полного журнала
@@ -181,7 +189,6 @@ class MainFrame(wx.Frame):
         # self.updateButton = wx.Button(parent, wx.ID_ANY, "Обновить")
         # buttonSizer.Add(self.updateButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
-        # Разделитель между кнопками
         buttonSizer.AddSpacer(10)
 
         # Кнопка выбора даты
@@ -200,21 +207,61 @@ class MainFrame(wx.Frame):
 
         # Установить минимальную и максимальную даты
         min_date = wx.DateTime()
-        min_date.ParseDate("2025-01-01")
+        min_date.ParseDate(MINDATE)
 
         max_date = wx.DateTime()
-        max_date.ParseDate("2025-12-31")
+        max_date.ParseDate(MAXDATE)
 
         # Можно выбрать даты только в 2025 году
         self.datePicker.SetRange(min_date, max_date)
+
+        buttonSizer.AddSpacer(150)
+
+        self.addDriverButton = wx.Button(parent, wx.ID_ANY, "Добавить водителя")
+        buttonSizer.Add(self.addDriverButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        buttonSizer.AddSpacer(10)
+
+        self.addVehicleButton = wx.Button(parent, wx.ID_ANY, "Добавить автомобиль")
+        buttonSizer.Add(self.addVehicleButton, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
         # Привязка обработчиков событий
         self.exportButton.Bind(wx.EVT_BUTTON, self.export_to_excel)
         # self.updateButton.Bind(wx.EVT_BUTTON, self.update)
         self.journalButton.Bind(wx.EVT_BUTTON, self.to_journal_frame)
         self.datePicker.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_change)
+        self.addDriverButton.Bind(wx.adv.EVT_DATE_CHANGED, self.add_driver)
+        self.addVehicleButton.Bind(wx.adv.EVT_DATE_CHANGED, self.add_vehicle)
 
         return buttonSizer
+
+    # & -----------------      Функционал      -----------------  #
+
+    def functionality(self):
+        """Функционал загружаемый в ui при старте"""
+        # Перенаправление вывода
+        sys.stdout = RedirectText(self.logPanel)
+
+        # Загрузка моделей
+        self.download_models()
+
+        # Запуск наблюдателя за папкой
+        self.start_file_watcher()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
+
+    def to_journal_frame(self, event):
+        """Открытие окна журнала"""
+        self.journal = JournalFrame(None)
+        self.journal.Show()
+
+    def to_login_frame(self, event):
+        """Открытие окна журнала"""
+        self.login = LoginFrame(None)
+        self.login.ShowModal()
+
+    # & -----------------  Интерфейс  -----------------  #
 
     def setup_colors(self):
         """Настройка цветовой схемы"""
@@ -227,16 +274,6 @@ class MainFrame(wx.Frame):
         self.logGrid.SetLabelBackgroundColour(
             wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
         )
-
-    def to_journal_frame(self, event):
-        """Открытие окна журнала"""
-        self.journal = JournalFrame(None)
-        self.journal.Show()
-
-    def to_login_frame(self, event):
-        """Открытие окна журнала"""
-        self.login = LoginFrame(None)
-        self.login.ShowModal()
 
     def create_ui(self):
         """Создает интерфейс"""
@@ -260,125 +297,15 @@ class MainFrame(wx.Frame):
         mainSizer.Add(midSizer, 15, wx.EXPAND, 5)
         mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
 
+        self.functionality()
+
         self.SetSizer(mainSizer)
         self.Layout()
-
-        # Перенаправление вывода
-        sys.stdout = RedirectText(self.logPanel)
-
-        # Загрузка моделей
-        self.download_models()
-
-        # Запуск наблюдателя за папкой
-        self.start_file_watcher()
-
-        # Загрузка данных в таблицу
-        self.load_data_from_db()
 
     # & -----------------       Лог     -----------------  #
 
     def log_message(self, message):
         wx.CallAfter(self.logPanel.AppendText, message)
-
-    # & -----------------  Распознование  ---------------  #
-
-    def start_file_watcher(self):
-        """Запуск наблюдателя за папкой plates"""
-        path = "./plates"
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-        self.observer = Observer()
-        self.observer.schedule(FileWatcher(self), path, recursive=False)
-        self.observer.start()
-        self.log_message(f"Наблюдение за папкой {path[2:]} запущено...\n\n")
-
-    def download_models(self):
-        """Фоновая загрузка моделей"""
-        threading.Thread(target=self.download_task, daemon=True).start()
-
-    def download_task(self):
-        """Загрузка моделей"""
-        try:
-            wx.CallAfter(self.log_message, "Поиск моделей...\n")
-            self.download()
-            if not all(
-                os.path.isfile(f)
-                for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
-            ):
-                raise Exception("Не удалось загрузить все модели")
-            wx.CallAfter(self.log_message, "Модели успешно загружены!\n")
-        except Exception as e:
-            wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
-
-    def process_new_file(self, file_path):
-        """Фоновая обработка распознавания номера"""
-        threading.Thread(
-            target=self.recognition_task, args=(file_path,), daemon=True
-        ).start()
-
-    def recognition_task(self, file_path):
-        """Распознавания номера"""
-        try:
-            wx.CallAfter(
-                self.log_message,
-                f"\nОбнаружен новый файл: {os.path.basename(file_path)}\n",
-            )
-
-            # Проверка наличия моделей
-            if not all(
-                os.path.isfile(f)
-                for f in ["model_resnet.tflite", "model_number_recognition.tflite"]
-            ):
-                raise FileNotFoundError(
-                    "Модели не найдены! Проверьте подключение к интернету"
-                )
-
-            # Запуск распознавания
-            recognized_number = self.recognition(file_path, self)
-            if recognized_number:
-                wx.CallAfter(
-                    self.log_message, f"Распознанный номер: {recognized_number}\n"
-                )
-                if self.is_number_registered(recognized_number):
-                    self.load_data_to_db(recognized_number)
-                    wx.CallAfter(self.log_message, "Вход разрешен\n")
-                    self.on_date_change()
-                else:
-                    wx.CallAfter(self.log_message, "Вход запрещен\n")
-            else:
-                wx.CallAfter(self.log_message, "Номер не распознан\n")
-
-        except Exception as e:
-            wx.CallAfter(self.log_message, f"\nОШИБКА РАСПОЗНАВАНИЯ: {str(e)}\n")
-
-    def is_number_registered(self, number):
-        """Загружает зарегистрированные номера из базы данных."""
-        try:
-            # Подключение к БД
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                dbname=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD,
-            )
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT vehiclemark FROM vehicle;")
-            numbers = {row[0] for row in cursor.fetchall()}
-
-            cursor.close()
-            conn.close()
-
-            return number in numbers
-
-        except Exception as e:
-            print(f"ОШИБКА ПРОВЕРКИ НОМЕРА: {e}")
-            return set()
-        finally:
-            cursor.close()
-            conn.close()
 
     # & -----------------  Изображение  -----------------  #
 
@@ -416,16 +343,6 @@ class MainFrame(wx.Frame):
 
     # & -----------------     Журнал     ----------------  #
 
-    def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
-        """Обработчик на изменение даты"""
-        # Получить объект wx.DateTime
-        current_date = self.datePicker.GetValue()
-
-        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
-        date = current_date.FormatISODate()  # Пример: "2025-03-12"
-
-        self.load_data_from_db(date)
-
     def update(self, event):
         """Обновление журнала без полной перезагрузки таблицы"""
         pass
@@ -434,7 +351,22 @@ class MainFrame(wx.Frame):
         """Обновляет размеры столбцов после добавления данных."""
         self.logGrid.AutoSizeColumns()
 
-    def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
+    def get_date(self) -> wx.DateTime:
+        """Получение даты"""
+        return self.datePicker.GetValue()
+
+    def date_to_iso(self, date) -> wx.DateTime:
+        """Преобразование даты в ISO-формат ГГГГ-ММ-ДД"""
+        return date.FormatISODate()
+
+    def on_date_change(self, date: wx.DateTime = wx.DateTime.Now().FormatISODate()):
+        """Обработчик на изменение даты"""
+        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
+        date = self.date_to_iso(self.get_date())  # Пример: "2025-03-12"
+
+        self.load_data_from_db(date)
+
+    def load_data_from_db(self, date: wx.DateTime = wx.DateTime.Now().FormatISODate()):
         """Загружает данные из БД в журнал"""
         try:
             # Подключение к БД
@@ -560,7 +492,7 @@ class MainFrame(wx.Frame):
                 )
 
                 # Запрос
-                query = f"""
+                query = """
                 SELECT
                 CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
                 CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
@@ -571,15 +503,26 @@ class MainFrame(wx.Frame):
                 FROM "log" AS l
                 JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
                 JOIN "driver" AS d ON v.id_driver = d.id_driver
+                WHERE l.transittime::date = %(date)s
                 ORDER BY l.transittime DESC
-                LIMIT {row_count}
+                LIMIT %(row)s
                 """
-                df = pd.read_sql(query, conn)  # Pandas DataFrame (df)
+                df = pd.read_sql(
+                    query,
+                    conn,
+                    params={
+                        "date": self.date_to_iso(self.get_date()),
+                        "row": row_count,
+                    },
+                )  # Pandas DataFrame (df)
                 conn.close()
 
                 # Сохранение Excel на рабочем столе
-                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-                output_file = os.path.join(desktop_path, "logbook_export.xlsx")
+                desktop_path = os.path.join(os.path.expanduser("~"), "D:\Desktop")
+                output_file = os.path.join(
+                    desktop_path,
+                    f"Журнал_{self.datePicker.GetValue().FormatISODate()}.xlsx",
+                )
 
                 df.to_excel(output_file, index=False)
                 wx.MessageBox(
@@ -591,32 +534,115 @@ class MainFrame(wx.Frame):
             except Exception as e:
                 wx.MessageBox(f"ОШИБКА ЭКСПОРТА: {e}", "Ошибка", wx.ICON_ERROR)
             finally:
+                self.load_data_from_db(self.date_to_iso(self.get_date()))
                 conn.close()
 
         dlg.Destroy()
 
-    # & -----------------  Свои функции  -----------------  #
+    def add_driver(self):
+        pass
+
+    def add_vehicle(self):
+        pass
+
+    # & -----------------  Распознование  ---------------  #
+
+    def start_file_watcher(self):
+        """Запуск наблюдателя за папкой plates"""
+        path = "./plates"
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        self.observer = Observer()
+        self.observer.schedule(FileWatcher(self), path, recursive=False)
+        self.observer.start()
+        self.log_message("Наблюдение запущено...\n")
+
+    def download_models(self):
+        """Фоновая загрузка моделей"""
+        threading.Thread(target=self.download_task, daemon=True).start()
+
+    def download_task(self):
+        """Загрузка моделей"""
+        try:
+            wx.CallAfter(self.log_message, "Поиск моделей...\n")
+            self.download()
+            if not all(
+                os.path.isfile(f)
+                for f in [
+                    "models/model_resnet.tflite",
+                    "models/model_number_recognition.tflite",
+                ]
+            ):
+                raise Exception("Не удалось загрузить все модели")
+            wx.CallAfter(self.log_message, "Модели успешно загружены!\n")
+        except Exception as e:
+            wx.CallAfter(self.log_message, f"ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {str(e)}\n")
 
     def download(self):
         """Скачивание моделей распознования"""
         try:
-            if not os.path.isfile("model_resnet.tflite"):
+            if not os.path.isfile("models/model_resnet.tflite"):
                 print("Загрузка model_resnet.tflite...")
                 gdown.download(
                     "https://disk.yandex.ru/d/QavLH1pvpRhLOA",
-                    "model_resnet.tflite",
+                    "models/model_resnet.tflite",
                     quiet=True,
                 )
 
-            if not os.path.isfile("model_number_recognition.tflite"):
+            if not os.path.isfile("models/model_number_recognition.tflite"):
                 print("Загрузка model_number_recognition.tflite...")
                 gdown.download(
                     "https://github.com/sovse/tflite_avto_num_recognation/blob/main/model1_nomer.tflite",
-                    "model_number_recognition.tflite",
+                    "models/model_number_recognition.tflite",
                     quiet=True,
                 )
         except requests.exceptions.RequestException as e:
             raise Exception(f"ОШИБКА ПОДКЛЮЧЕНИЯ К СЕТИ: {str(e)}")
+
+    def recognition_observe(self, file_path):
+        """Фоновая обработка распознавания номера"""
+        threading.Thread(
+            target=self.recognition_task, args=(file_path,), daemon=True
+        ).start()
+
+    def recognition_task(self, file_path):
+        """Распознавания номера"""
+        try:
+            wx.CallAfter(
+                self.log_message,
+                f"\nОбнаружен новый файл: {os.path.basename(file_path)}\n",
+            )
+
+            # Проверка наличия моделей
+            if not all(
+                os.path.isfile(f)
+                for f in [
+                    "models/model_resnet.tflite",
+                    "models/model_number_recognition.tflite",
+                ]
+            ):
+                raise FileNotFoundError(
+                    "Модели не найдены! Проверьте подключение к интернету"
+                )
+
+            # Запуск распознавания
+            recognized_number = self.recognition(file_path, self)
+            if recognized_number:
+                wx.CallAfter(
+                    self.log_message, f"Распознанный номер: {recognized_number}\n"
+                )
+                if self.is_number_registered(recognized_number):
+                    self.load_data_to_db(recognized_number)
+                    wx.CallAfter(self.log_message, "Вход разрешен\n")
+                    self.on_date_change()
+                else:
+                    wx.CallAfter(self.log_message, "Вход запрещен\n")
+            else:
+                wx.CallAfter(self.log_message, "Номер не распознан\n")
+
+        except Exception as e:
+            wx.CallAfter(self.log_message, f"\nОШИБКА РАСПОЗНАВАНИЯ: {str(e)}\n")
 
     def decode_batch(self, out):
         """Алфавит номеров"""
@@ -632,8 +658,9 @@ class MainFrame(wx.Frame):
     def recognition(self, file_path, frame):
         """Распознование"""
         try:
-            modelRecPath = "model_resnet.tflite"
-            modelPath = "model_number_recognition.tflite"
+            modelpath = "models/"
+            modelRecPath = modelpath + "model_resnet.tflite"
+            modelPath = modelpath + "model_number_recognition.tflite"
 
             # Чтение изображения
             image0 = cv2.imread(file_path, 1)
@@ -736,8 +763,33 @@ class MainFrame(wx.Frame):
             print(f"ОШИБКА РАСПОЗНОВАНИЯ: {str(e)}")
             return None
 
-    def __del__(self):
-        pass
+    def is_number_registered(self, number):
+        """Загружает зарегистрированные номера из базы данных."""
+        try:
+            # Подключение к БД
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+            )
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT vehiclemark FROM vehicle;")
+            numbers = {row[0] for row in cursor.fetchall()}
+
+            cursor.close()
+            conn.close()
+
+            return number in numbers
+
+        except Exception as e:
+            print(f"ОШИБКА ПРОВЕРКИ НОМЕРА: {e}")
+            return set()
+        finally:
+            cursor.close()
+            conn.close()
 
 
 # & -----------------  Окно журнала  -----------------  #
@@ -771,26 +823,7 @@ class JournalFrame(wx.Frame):
         self.Centre()
         self.Show()
 
-    def create_ui(self):
-        """Создает интерфейс."""
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Верхний сайзер (изображение + лог панель)
-        highSizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        # Нижний сайзер (таблица логов + кнопка)
-        downSizer = wx.BoxSizer(wx.VERTICAL)
-        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
-
-        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
-        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
-        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
-
-        self.SetSizer(mainSizer)
-        self.Layout()
-
-        # Загрузка данных в таблицу
-        self.load_data_from_db()
+    # & -----------------       Панели     -----------------  #
 
     def create_grid_panel(self, parent):
         """Создает панель для таблицы журнала."""
@@ -877,34 +910,29 @@ class JournalFrame(wx.Frame):
 
         return buttonSizer
 
-    def setup_colors(self):
-        """Настройка цветовой схемы"""
-        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        self.SetBackgroundColour(bg_color)
-
-        # Настройка таблицы
-        self.logGrid.SetBackgroundColour(bg_color)
-        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
-        self.logGrid.SetLabelBackgroundColour(
-            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
-        )
-
-    def on_date_change(self, date=wx.DateTime.Now().FormatISODate()):
-        """Обработчик на изменение даты"""
-        # Получить объект wx.DateTime
-        current_date = self.datePicker.GetValue()
-
-        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
-        date = current_date.FormatISODate()  # Пример: "2025-03-12"
-
-        self.load_data_from_db(date)
+    # & -----------------     Журнал     ----------------  #
 
     def update_grid(self):
         """Обновляет размеры столбцов после добавления данных."""
         self.logGrid.AutoSizeColumns()
 
-    def load_data_from_db(self, date=wx.DateTime.Now().FormatISODate()):
-        """Загружает данные из БД в таблицу"""
+    def get_date(self) -> wx.DateTime:
+        """Получение даты"""
+        return self.datePicker.GetValue()
+
+    def date_to_iso(self, date) -> wx.DateTime:
+        """Преобразование даты в ISO-формат ГГГГ-ММ-ДД"""
+        return date.FormatISODate()
+
+    def on_date_change(self, date: wx.DateTime = wx.DateTime.Now().FormatISODate()):
+        """Обработчик на изменение даты"""
+        # Преобразовать в строку (ISO-формат: ГГГГ-ММ-ДД)
+        date = self.date_to_iso(self.get_date())  # Пример: "2025-03-12"
+
+        self.load_data_from_db(date)
+
+    def load_data_from_db(self, date: wx.DateTime = wx.DateTime.Now().FormatISODate()):
+        """Загружает данные из БД в журнал"""
         try:
             # Подключение к БД
             conn = psycopg2.connect(
@@ -987,7 +1015,7 @@ class JournalFrame(wx.Frame):
                 )
 
                 # Запрос
-                query = f"""
+                query = """
                 SELECT
                 CONCAT_WS(' ', v.vehiclecolor, v.vehicletype, v.vehiclemark) AS vehicle,
                 CONCAT_WS(' ', d.driver_firstname, d.driver_secondname, d.driver_patronymic) AS driver,
@@ -998,15 +1026,26 @@ class JournalFrame(wx.Frame):
                 FROM "log" AS l
                 JOIN "vehicle" AS v ON l.id_vehicle = v.id_vehicle
                 JOIN "driver" AS d ON v.id_driver = d.id_driver
+                WHERE l.transittime::date = %(date)s
                 ORDER BY l.transittime DESC
-                LIMIT {row_count}
+                LIMIT %(row)s
                 """
-                df = pd.read_sql(query, conn)  # Pandas DataFrame (df)
+                df = pd.read_sql(
+                    query,
+                    conn,
+                    params={
+                        "date": self.date_to_iso(self.get_date()),
+                        "row": row_count,
+                    },
+                )  # Pandas DataFrame (df)
                 conn.close()
 
                 # Сохранение Excel на рабочем столе
-                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-                output_file = os.path.join(desktop_path, "logbook_export.xlsx")
+                desktop_path = os.path.join(os.path.expanduser("~"), "D:\Desktop")
+                output_file = os.path.join(
+                    desktop_path,
+                    f"Журнал_{self.datePicker.GetValue().FormatISODate()}.xlsx",
+                )
 
                 df.to_excel(output_file, index=False)
                 wx.MessageBox(
@@ -1018,12 +1057,48 @@ class JournalFrame(wx.Frame):
             except Exception as e:
                 wx.MessageBox(f"ОШИБКА ЭКСПОРТА: {e}", "Ошибка", wx.ICON_ERROR)
             finally:
+                self.load_data_from_db(self.date_to_iso(self.get_date()))
                 conn.close()
 
         dlg.Destroy()
 
     def on_close(self, event):
         self.Destroy()  # Закрыть только второе окно
+
+    # & -----------------  Интерфейс  -----------------  #
+
+    def setup_colors(self):
+        """Настройка цветовой схемы"""
+        bg_color = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        self.SetBackgroundColour(bg_color)
+
+        # Настройка таблицы
+        self.logGrid.SetBackgroundColour(bg_color)
+        self.logGrid.SetDefaultCellBackgroundColour(bg_color)
+        self.logGrid.SetLabelBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+        )
+
+    def create_ui(self):
+        """Создает интерфейс."""
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Верхний сайзер (изображение + лог панель)
+        highSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Нижний сайзер (таблица логов + кнопка)
+        downSizer = wx.BoxSizer(wx.VERTICAL)
+        downSizer.Add(self.create_grid_panel(self), 1, wx.EXPAND, 5)
+
+        # Добавление Верхнего и Нижнего сайзера в Главный сайзер
+        mainSizer.Add(highSizer, 1, wx.EXPAND, 5)
+        mainSizer.Add(downSizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+        # Загрузка данных в таблицу
+        self.load_data_from_db()
 
 
 # & -----------------  Окно авторизации  -----------------  #
@@ -1085,13 +1160,17 @@ class LoginFrame(wx.Dialog):
         button.Bind(wx.EVT_BUTTON, self.on_login)
         btn_cancel.Bind(wx.EVT_BUTTON, self.on_cancel)
 
-    def get_login_data(self):
+    def get_login_data(self) -> str:
         """Возвращает введенные данные логина"""
         return self.txt_login.GetValue()
 
-    def get_passwd_data(self):
+    def get_passwd_data(self) -> str:
         """Возвращает введенные данные пароля"""
         return self.txt_password.GetValue()
+
+    def hashfunction(self, data: str) -> str:
+        """Returns the hash of the entered data"""
+        return hash_.sha256(bytes(data, "utf-8")).hexdigest()
 
     def on_login(self, event):
         """При авторизации"""
@@ -1132,14 +1211,14 @@ class LoginFrame(wx.Dialog):
             return
 
         # Проверка логина и пароля
-        if hash_.sha256(bytes(self.get_login_data(), "utf-8")).hexdigest() != data[0]:
+        if self.hashfunction(self.get_login_data()) != data[0]:
             wx.MessageBox(
                 "Пользователь с таким логином не найден",
                 "Ошибка",
                 wx.OK | wx.ICON_ERROR,
             )
             return
-        if hash_.sha256(bytes(self.get_passwd_data(), "utf-8")).hexdigest() != data[1]:
+        if self.hashfunction(self.get_passwd_data()) != data[1]:
             wx.MessageBox(
                 "Неправильный логин или пароль",
                 "Ошибка",
