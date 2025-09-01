@@ -5,6 +5,7 @@ A comprehensive license plate recognition system with a modern, modular architec
 ## 🚀 Major Improvements Made
 
 ### ✅ **Modular Architecture**
+
 - **Separated concerns** into dedicated modules:
   - `config.py` - Centralized configuration management
   - `database_manager.py` - Database operations with connection pooling
@@ -12,6 +13,7 @@ A comprehensive license plate recognition system with a modern, modular architec
   - `main_improved.py` - Clean main application with improved UI
 
 ### ✅ **Database Management**
+
 - **Connection pooling** for better performance and resource management
 - **Proper error handling** and transaction management
 - **Context managers** for safe database operations
@@ -19,6 +21,7 @@ A comprehensive license plate recognition system with a modern, modular architec
 - **Centralized database operations** with reusable methods
 
 ### ✅ **Security Enhancements**
+
 - **Secure password hashing** using SHA-256
 - **Environment variable configuration** for sensitive data
 - **Input validation** and sanitization
@@ -26,6 +29,7 @@ A comprehensive license plate recognition system with a modern, modular architec
 - **Removal of hardcoded credentials** and paths
 
 ### ✅ **Error Handling & Logging**
+
 - **Comprehensive logging** system with file and console output
 - **Try-catch blocks** around all critical operations
 - **User-friendly error messages** with technical details logged
@@ -33,6 +37,7 @@ A comprehensive license plate recognition system with a modern, modular architec
 - **Resource cleanup** to prevent memory leaks
 
 ### ✅ **Performance Optimizations**
+
 - **Lazy loading** of ML models
 - **Background processing** for heavy operations
 - **Image caching** and optimized processing pipeline
@@ -40,6 +45,7 @@ A comprehensive license plate recognition system with a modern, modular architec
 - **Memory management** improvements
 
 ### ✅ **UI/UX Improvements**
+
 - **Consistent error handling** with proper user feedback
 - **Responsive design** with proper window sizing
 - **Better form validation** with real-time feedback
@@ -68,12 +74,15 @@ license_plate_recognition/
 ## 🛠️ Installation & Setup
 
 ### 1. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment Variables
+
 Create a `.env` file in the project root:
+
 ```env
 DB_HOST=localhost
 DB_PORT=5432
@@ -83,13 +92,16 @@ DB_PASSWORD=your_password
 ```
 
 ### 3. Database Setup
+
 Ensure your PostgreSQL database has the required tables:
+
 - `driver` (driver information)
 - `vehicle` (vehicle registration)
 - `log` (access logs)
 - `private.account` (user authentication)
 
 ### 4. Run the Application
+
 ```bash
 # Run the improved version
 python main_improved.py
@@ -101,28 +113,33 @@ python main.py
 ## 🎯 Key Features
 
 ### **License Plate Recognition**
+
 - Real-time processing of images in the `plates/` directory
 - Advanced image preprocessing with rotation correction
 - Deep learning models for plate detection and text recognition
 - Support for multiple image formats (JPG, PNG, BMP)
 
 ### **Database Integration**
+
 - PostgreSQL integration with connection pooling
 - Automatic logging of vehicle access events
 - Real-time data updates in the UI
 - Export functionality to Excel
 
 ### **User Management**
+
 - Secure authentication system
 - User registration with proper validation
 - Role-based access (can be extended)
 
 ### **Vehicle Management**
+
 - Add/edit driver information
 - Vehicle registration with driver assignment
 - Real-time vehicle status tracking
 
 ### **Monitoring & Logging**
+
 - File system monitoring for new images
 - Comprehensive application logging
 - Error tracking and debugging information
@@ -153,6 +170,7 @@ models.recognition_url = "https://..."
 ## 📊 Database Schema
 
 ### Core Tables
+
 - **driver**: Driver information (ID, name, birth date, nationality)
 - **vehicle**: Vehicle registration (ID, plate number, color, type, driver_id)
 - **log**: Access logs (ID, vehicle_id, timestamp, entry/exit type)
@@ -161,6 +179,7 @@ models.recognition_url = "https://..."
 ## 🚨 Error Handling
 
 The improved system handles various error scenarios:
+
 - **Database connection failures** - Graceful fallback with user notification
 - **Model loading errors** - Background retry with status updates
 - **Image processing failures** - Skip invalid files, log errors
@@ -177,7 +196,8 @@ The improved system handles various error scenarios:
 
 ## 📈 Performance Improvements
 
-### Before vs After:
+### Before vs After
+
 - **Database connections**: Raw connections → Connection pooling
 - **Error handling**: Basic try-catch → Comprehensive error management
 - **Code organization**: Monolithic file → Modular architecture
@@ -187,11 +207,13 @@ The improved system handles various error scenarios:
 ## 🐛 Debugging
 
 ### Log Files
+
 - Application logs: `app.log`
 - Error details with stack traces
 - Performance metrics and timing information
 
 ### Common Issues
+
 1. **Database connection errors** - Check `.env` file and database status
 2. **Model download failures** - Verify internet connection and URLs
 3. **Image processing errors** - Check image format and file permissions
@@ -210,6 +232,7 @@ To migrate from the original `main.py`:
 ## 🤝 Contributing
 
 When contributing to this improved version:
+
 1. Follow the modular architecture patterns
 2. Add proper error handling and logging
 3. Include type hints for better code documentation
