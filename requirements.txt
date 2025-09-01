@@ -1,0 +1,29 @@
+# License Plate Recognition System Requirements
+
+# Core GUI Framework
+wxPython>=4.2.0
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+scikit-image>=0.21.0
+numpy>=1.24.0
+
+# Machine Learning
+tensorflow>=2.13.0
+
+# Database
+psycopg2-binary>=2.9.0
+pandas>=2.0.0
+
+# File Operations and Utilities
+python-dotenv>=1.0.0
+gdown>=4.7.0
+requests>=2.31.0
+openpyxl>=3.1.0
+
+# File System Monitoring
+watchdog>=3.0.0
+
+# Object Detection (if using YOLO)
+ultralytics>=8.0.0
