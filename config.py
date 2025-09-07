@@ -37,7 +37,7 @@ class DateConfig:
 class PathConfig:
     """Path configuration."""
 
-    user_path: str = "../Desktop"
+    user_path: str = "Desktop"
     models_path: str = "models"
     plates_path: str = "plates"
     icon_path: str = "docs/app_icon.ico"

@@ -530,9 +530,9 @@ class MainFrame(wx.Frame):
         """Export data to Excel."""
         dlg = wx.NumberEntryDialog(
             self,
-            "Enter number of rows to export:",
-            "Export to Excel",
-            "Rows",
+            self.lang.get_text("export_dialog_message"),
+            self.lang.get_text("export_rows_label"),
+            self.lang.get_text("export_dialog_title"),
             50,
             1,
             1000,
@@ -1052,7 +1052,10 @@ class AddUserFrame(wx.Frame):
     """Add user dialog."""
 
     def __init__(self, parent):
-        super().__init__(parent, title="Add User", size=(300, 200))
+        self.lang = get_lang_manager()
+        super().__init__(
+            parent, title=self.lang.get_text("add_user_title"), size=(400, 200)
+        )
         self.db = get_db_manager()
         self.create_ui()
         self.Centre()
@@ -1067,14 +1070,18 @@ class AddUserFrame(wx.Frame):
 
         # Username
         form_sizer.Add(
-            wx.StaticText(panel, label="Username:"), 0, wx.ALIGN_CENTER_VERTICAL
+            wx.StaticText(panel, label=self.lang.get_text("username")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL,
         )
         self.username_ctrl = wx.TextCtrl(panel)
         form_sizer.Add(self.username_ctrl, 1, wx.EXPAND)
 
         # Password
         form_sizer.Add(
-            wx.StaticText(panel, label="Password:"), 0, wx.ALIGN_CENTER_VERTICAL
+            wx.StaticText(panel, label=self.lang.get_text("password")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL,
         )
         self.password_ctrl = wx.TextCtrl(panel, style=wx.TE_PASSWORD)
         form_sizer.Add(self.password_ctrl, 1, wx.EXPAND)
@@ -1084,8 +1091,8 @@ class AddUserFrame(wx.Frame):
 
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        add_btn = wx.Button(panel, label="Add User")
-        cancel_btn = wx.Button(panel, label="Cancel")
+        add_btn = wx.Button(panel, label=self.lang.get_text("add_user"))
+        cancel_btn = wx.Button(panel, label=self.lang.get_text("cancel"))
         button_sizer.Add(add_btn, 0, wx.RIGHT, 5)
         button_sizer.Add(cancel_btn, 0)
         vbox.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 10)
