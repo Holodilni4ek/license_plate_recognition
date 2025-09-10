@@ -1,5 +1,7 @@
 # License Plate Recognition System - Improved Version
 
+[![ru](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README-ru.md)
+
 A comprehensive license plate recognition system with a modern, modular architecture, proper error handling, and enhanced security features.
 
 ## 🚀 Major Improvements Made

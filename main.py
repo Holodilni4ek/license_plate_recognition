@@ -23,7 +23,7 @@ from PIL import Image
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-# Import our improved modules
+# Import my modules
 from config import get_config
 from database_manager import get_db_manager
 from recognition import get_recognizer
@@ -251,7 +251,7 @@ class MainFrame(wx.Frame):
         button_sizer.Add(
             self.add_driver_button, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5
         )
-        self.add_driver_button.Bind(wx.EVT_BUTTON, self.on_add_driver)
+        self.add_driver_button.Bind(wx.EVT_BUTTON, self.on_driver_list)
 
         # Add vehicle button
         self.add_vehicle_button = wx.Button(
@@ -260,14 +260,14 @@ class MainFrame(wx.Frame):
         button_sizer.Add(
             self.add_vehicle_button, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5
         )
-        self.add_vehicle_button.Bind(wx.EVT_BUTTON, self.on_add_vehicle)
+        self.add_vehicle_button.Bind(wx.EVT_BUTTON, self.on_vehicle_list)
 
         # Add user button
         self.add_user_button = wx.Button(
             self, wx.ID_ANY, self.lang.get_text("add_user")
         )
         button_sizer.Add(self.add_user_button, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.add_user_button.Bind(wx.EVT_BUTTON, self.on_add_user)
+        self.add_user_button.Bind(wx.EVT_BUTTON, self.on_user_list)
 
         # Language toggle button
         button_sizer.AddSpacer(20)
@@ -573,14 +573,29 @@ class MainFrame(wx.Frame):
         journal = JournalFrame(None)
         journal.Show()
 
+    def on_driver_list(self, event):
+        """Open driver list dialog"""
+        dlg = DriverListFrame(None)
+        dlg.Show()
+
     def on_add_driver(self, event):
         """Open add driver dialog."""
         dlg = AddDriverFrame(None)
         dlg.Show()
 
+    def on_vehicle_list(self, event):
+        """Open vehicle list dialog"""
+        dlg = VehicleListFrame(None)
+        dlg.Show()
+
     def on_add_vehicle(self, event):
         """Open add vehicle dialog."""
         dlg = AddVehicleFrame(None)
+        dlg.Show()
+
+    def on_user_list(self, event):
+        """Open user list dialog"""
+        dlg = UserListFrame(None)
         dlg.Show()
 
     def on_add_user(self, event):
@@ -788,6 +803,312 @@ class JournalFrame(wx.Frame):
 
         except Exception as e:
             logger.error(f"Failed to load journal data: {e}")
+
+
+class DriverListFrame(wx.Frame):
+    """Drivers list frame."""
+
+    def __init__(self, parent):
+        self.lang = get_lang_manager()
+        super().__init__(
+            parent, title=self.lang.get_text("drivers_list_title"), size=(500, 300)
+        )
+        self.db = get_db_manager()
+        self.create_ui()
+        self.Centre()
+
+    def create_ui(self):
+        """Create UI for displaying drivers list."""
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        # Drivers list
+        self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.InsertColumn(0, self.lang.get_text("driver_id"), width=80)
+        self.list_ctrl.InsertColumn(1, self.lang.get_text("name"), width=120)
+        self.list_ctrl.InsertColumn(2, self.lang.get_text("birth_date"), width=120)
+        self.list_ctrl.InsertColumn(3, self.lang.get_text("nationality"), width=120)
+        vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Buttons
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        refresh_btn = wx.Button(panel, label=self.lang.get_text("refresh"))
+        add_btn = wx.Button(panel, label=self.lang.get_text("add_driver"))
+        delete_btn = wx.Button(panel, label=self.lang.get_text("delete_driver"))
+        close_btn = wx.Button(panel, label=self.lang.get_text("cancel"))
+
+        button_sizer.Add(refresh_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(add_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(delete_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(close_btn, 0)
+
+        vbox.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 10)
+        panel.SetSizer(vbox)
+
+        # Bind events
+        refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        add_btn.Bind(wx.EVT_BUTTON, self.on_add_driver)
+        delete_btn.Bind(wx.EVT_BUTTON, self.on_delete_driver)
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+
+        # Initial load
+        self.load_drivers()
+
+    def load_drivers(self):
+        """Load drivers from DB and populate list."""
+        self.list_ctrl.DeleteAllItems()
+        try:
+            drivers = self.db.get_all_drivers()
+            for driver in drivers:
+                index = self.list_ctrl.InsertItem(
+                    self.list_ctrl.GetItemCount(), str(driver[0])
+                )
+                self.list_ctrl.SetItem(index, 1, str(driver[1]))
+                self.list_ctrl.SetItem(index, 2, str(driver[2]))
+                self.list_ctrl.SetItem(index, 3, str(driver[3]))
+        except Exception as e:
+            logger.error(f"Failed to load drivers: {e}")
+            wx.MessageBox(f"Error loading drivers: {e}", "Error", wx.OK | wx.ICON_ERROR)
+
+    def on_refresh(self, event):
+        self.load_drivers()
+
+    def on_add_driver(self, event):
+        """Open the add udriver dialog (reuse your existing AdddDiverFrame or similar)."""
+        add_frame = AddDriverFrame(self)
+        add_frame.Show()
+        self.load_drivers()
+
+    def on_delete_driver(self, event):
+        selected = self.list_ctrl.GetFirstSelected()
+        if selected == -1:
+            wx.MessageBox("No driver selected", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        driver_id = self.list_ctrl.GetItemText(selected)
+        drivername = self.list_ctrl.GetItem(selected, 1).GetText()
+        confirm = wx.MessageBox(
+            f"Delete driver '{drivername}'?",
+            "Confirm",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+        )
+        if confirm == wx.YES:
+            try:
+                self.db.delete_driver(int(driver_id))
+                self.load_drivers()
+                wx.MessageBox("Driver deleted", "Info", wx.OK | wx.ICON_INFORMATION)
+            except Exception as e:
+                logger.error(f"Failed to delete driver: {e}")
+                wx.MessageBox(
+                    f"Error deleting driver: {e}", "Error", wx.OK | wx.ICON_ERROR
+                )
+
+    def on_close(self, event):
+        self.Close()
+
+
+class VehicleListFrame(wx.Frame):
+    """Vehicles list frame."""
+
+    def __init__(self, parent):
+        self.lang = get_lang_manager()
+        super().__init__(
+            parent, title=self.lang.get_text("vehicles_list_title"), size=(500, 300)
+        )
+        self.db = get_db_manager()
+        self.create_ui()
+        self.Centre()
+
+    def create_ui(self):
+        """Create UI for displaying vehicles list."""
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        # Vehicles list
+        self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.InsertColumn(0, self.lang.get_text("vehicle_id"), width=100)
+        self.list_ctrl.InsertColumn(1, self.lang.get_text("type_model")[:-1], width=80)
+        self.list_ctrl.InsertColumn(1, self.lang.get_text("color")[:-1], width=80)
+        self.list_ctrl.InsertColumn(
+            1, self.lang.get_text("license_plate")[:-1], width=80
+        )
+        vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Buttons
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        refresh_btn = wx.Button(panel, label=self.lang.get_text("refresh"))
+        add_btn = wx.Button(panel, label=self.lang.get_text("add_vehicle"))
+        delete_btn = wx.Button(panel, label=self.lang.get_text("delete_vehicle"))
+        close_btn = wx.Button(panel, label=self.lang.get_text("cancel"))
+
+        button_sizer.Add(refresh_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(add_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(delete_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(close_btn, 0)
+
+        vbox.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 10)
+        panel.SetSizer(vbox)
+
+        # Bind events
+        refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        add_btn.Bind(wx.EVT_BUTTON, self.on_add_vehicle)
+        delete_btn.Bind(wx.EVT_BUTTON, self.on_delete_vehicle)
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+
+        # Initial load
+        self.load_vehicles()
+
+    def load_vehicles(self):
+        """Load vehicles from DB and populate list."""
+        self.list_ctrl.DeleteAllItems()
+        try:
+            vehicles = self.db.get_all_vehicles()
+            for vehicle in vehicles:
+                index = self.list_ctrl.InsertItem(
+                    self.list_ctrl.GetItemCount(), str(vehicle[0])
+                )
+                self.list_ctrl.SetItem(index, 1, vehicle[1])
+                self.list_ctrl.SetItem(index, 2, vehicle[2])
+                self.list_ctrl.SetItem(index, 3, vehicle[3])
+        except Exception as e:
+            logger.error(f"Failed to load vehicles: {e}")
+            wx.MessageBox(
+                f"Error loading vehicles: {e}", "Error", wx.OK | wx.ICON_ERROR
+            )
+
+    def on_refresh(self, event):
+        self.load_vehicles()
+
+    def on_add_vehicle(self, event):
+        """Open the add vehicle dialog (reuse your existing AddVehicleFrame or similar)."""
+        add_frame = AddVehicleFrame(self)
+        add_frame.Show()
+        self.load_vehicles()
+
+    def on_delete_vehicle(self, event):
+        selected = self.list_ctrl.GetFirstSelected()
+        if selected == -1:
+            wx.MessageBox("No vehicle selected", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        vehicle_id = self.list_ctrl.GetItemText(selected)
+        vehiclename = self.list_ctrl.GetItem(selected, 1).GetText()
+        confirm = wx.MessageBox(
+            f"Delete vehicle '{vehiclename}'?",
+            "Confirm",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+        )
+        if confirm == wx.YES:
+            try:
+                self.db.delete_vehicle(int(vehicle_id))
+                self.load_vehicles()
+                wx.MessageBox("Vehicle deleted", "Info", wx.OK | wx.ICON_INFORMATION)
+            except Exception as e:
+                logger.error(f"Failed to delete vehicle: {e}")
+                wx.MessageBox(
+                    f"Error deleting vehicle: {e}", "Error", wx.OK | wx.ICON_ERROR
+                )
+
+    def on_close(self, event):
+        self.Close()
+
+
+class UserListFrame(wx.Frame):
+    """Users list frame."""
+
+    def __init__(self, parent):
+        self.lang = get_lang_manager()
+        super().__init__(
+            parent, title=self.lang.get_text("users_list_title"), size=(500, 300)
+        )
+        self.db = get_db_manager()
+        self.create_ui()
+        self.Centre()
+
+    def create_ui(self):
+        """Create UI for displaying users list."""
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        # Users list
+        self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.InsertColumn(0, self.lang.get_text("user_id"), width=100)
+        self.list_ctrl.InsertColumn(1, self.lang.get_text("username"), width=200)
+        vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Buttons
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        refresh_btn = wx.Button(panel, label=self.lang.get_text("refresh"))
+        add_btn = wx.Button(panel, label=self.lang.get_text("add_user"))
+        delete_btn = wx.Button(panel, label=self.lang.get_text("delete_user"))
+        close_btn = wx.Button(panel, label=self.lang.get_text("cancel"))
+
+        button_sizer.Add(refresh_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(add_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(delete_btn, 0, wx.RIGHT, 5)
+        button_sizer.Add(close_btn, 0)
+
+        vbox.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 10)
+        panel.SetSizer(vbox)
+
+        # Bind events
+        refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        add_btn.Bind(wx.EVT_BUTTON, self.on_add_user)
+        delete_btn.Bind(wx.EVT_BUTTON, self.on_delete_user)
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+
+        # Initial load
+        self.load_users()
+
+    def load_users(self):
+        """Load users from DB and populate list."""
+        self.list_ctrl.DeleteAllItems()
+        try:
+            users = self.db.get_all_users()
+            for user in users:
+                index = self.list_ctrl.InsertItem(
+                    self.list_ctrl.GetItemCount(), str(user[0])
+                )
+                self.list_ctrl.SetItem(index, 1, user[1])
+        except Exception as e:
+            logger.error(f"Failed to load users: {e}")
+            wx.MessageBox(f"Error loading users: {e}", "Error", wx.OK | wx.ICON_ERROR)
+
+    def on_refresh(self, event):
+        self.load_users()
+
+    def on_add_user(self, event):
+        """Open the add user dialog (reuse your existing AddUserFrame or similar)."""
+        add_frame = AddUserFrame(self)
+        add_frame.Show()
+        self.load_users()
+
+    def on_delete_user(self, event):
+        selected = self.list_ctrl.GetFirstSelected()
+        if selected == -1:
+            wx.MessageBox("No user selected", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        user_id = self.list_ctrl.GetItemText(selected)
+        username = self.list_ctrl.GetItem(selected, 1).GetText()
+        confirm = wx.MessageBox(
+            f"Delete user '{username}'?",
+            "Confirm",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+        )
+        if confirm == wx.YES:
+            try:
+                self.db.delete_user(int(user_id))
+                self.load_users()
+                wx.MessageBox("User deleted", "Info", wx.OK | wx.ICON_INFORMATION)
+            except Exception as e:
+                logger.error(f"Failed to delete user: {e}")
+                wx.MessageBox(
+                    f"Error deleting user: {e}", "Error", wx.OK | wx.ICON_ERROR
+                )
+
+    def on_close(self, event):
+        self.Close()
 
 
 class AddDriverFrame(wx.Frame):
@@ -1111,14 +1432,16 @@ class AddUserFrame(wx.Frame):
 
             if not username or not password:
                 wx.MessageBox(
-                    "Username and password are required", "Error", wx.OK | wx.ICON_ERROR
+                    self.lang.get_text("username_password_required"),
+                    self.lang.get_text("error"),
+                    wx.OK | wx.ICON_ERROR,
                 )
                 return
 
             if len(password) < 6:
                 wx.MessageBox(
-                    "Password must be at least 6 characters",
-                    "Error",
+                    self.lang.get_text("password_min_length"),
+                    self.lang.get_text("error"),
                     wx.OK | wx.ICON_ERROR,
                 )
                 return
@@ -1127,13 +1450,15 @@ class AddUserFrame(wx.Frame):
 
             if user_id:
                 wx.MessageBox(
-                    "User added successfully", "Success", wx.OK | wx.ICON_INFORMATION
+                    self.lang.get_text("user_added"),
+                    self.lang.get_text("success"),
+                    wx.OK | wx.ICON_INFORMATION,
                 )
                 self.Close()
             else:
                 wx.MessageBox(
-                    "Failed to add user (username may already exist)",
-                    "Error",
+                    self.lang.get_text("user_add_failed"),
+                    self.lang.get_text("error"),
                     wx.OK | wx.ICON_ERROR,
                 )
 

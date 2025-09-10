@@ -1,95 +1,246 @@
-# Распознавание автомобильных номеров
+# License Plate Recognition System - Improved Version
 
 [![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Holodilni4ek/license_plate_recognition/blob/master/README.md)
 
-**Приложение предназначено для автоматического распознавания автомобильных номеров с изображений и проверки, разрешен ли въезд автомобиля на основе списка зарегистрированных номеров.**
+A comprehensive license plate recognition system with a modern, modular architecture, proper error handling, and enhanced security features.
 
----
+## 🚀 Major Improvements Made
 
-## Требования
+### ✅ **Modular Architecture**
 
-Для работы приложения необходимо установить следующие компоненты:
+- **Separated concerns** into dedicated modules:
+  - `config.py` - Centralized configuration management
+  - `database_manager.py` - Database operations with connection pooling
+  - `recognition.py` - Image processing and ML inference
+  - `main_improved.py` - Clean main application with improved UI
 
-- **Python 3.8 или выше**
-- **PostgreSQL**
-- **Установленные библиотеки:**
-  - wxPython
-  - tensorflow
-  - opencv-python
-  - scikit-image
-  - matplotlib
-  - requests
-  - gdown
-  - watchdog
-  - numpy
+### ✅ **Database Management**
 
----
+- **Connection pooling** for better performance and resource management
+- **Proper error handling** and transaction management
+- **Context managers** for safe database operations
+- **Parameterized queries** to prevent SQL injection
+- **Centralized database operations** with reusable methods
 
-## Установка
+### ✅ **Security Enhancements**
 
-1. Клонируйте репозиторий проекта:
+- **Secure password hashing** using SHA-256
+- **Environment variable configuration** for sensitive data
+- **Input validation** and sanitization
+- **Proper authentication flow** with improved login system
+- **Removal of hardcoded credentials** and paths
 
-   ```bash
-   git clone https://github.com/RecognitionVLT.git
-   cd RecognitionVLT
+### ✅ **Error Handling & Logging**
 
-2. Установите необходимые библиотеки:
+- **Comprehensive logging** system with file and console output
+- **Try-catch blocks** around all critical operations
+- **User-friendly error messages** with technical details logged
+- **Graceful degradation** when components fail
+- **Resource cleanup** to prevent memory leaks
 
-    ```bash
-    pip install wxPython tensorflow opencv-python scikit-image matplotlib requests gdown watchdog numpy
+### ✅ **Performance Optimizations**
 
-3. Установить PostgreSQL вы можете с их официального [сайта](https://www.postgresql.org/).
+- **Lazy loading** of ML models
+- **Background processing** for heavy operations
+- **Image caching** and optimized processing pipeline
+- **Efficient database queries** with proper indexing considerations
+- **Memory management** improvements
 
-4. Импортируйте БД на свой сервер.
+### ✅ **UI/UX Improvements**
 
-    - Таблица **driver** \
-    ![alt text](docs/IMG_table_driver.png)
+- **Consistent error handling** with proper user feedback
+- **Responsive design** with proper window sizing
+- **Better form validation** with real-time feedback
+- **Improved button layouts** and navigation
+- **Fixed broken dialog forms** (AddDriver, AddVehicle, AddUser)
 
-    - Таблица **log** \
-    ![alt text](docs/IMG_table_log.png)
+## 📁 Project Structure
 
-    - Таблица **vehicle** \
-    ![alt text](docs/IMG_table_vehicle.png)
+```
+license_plate_recognition/
+├── main_improved.py          # Improved main application
+├── config.py                 # Configuration management
+├── database_manager.py       # Database operations
+├── recognition.py            # Image recognition module
+├── requirements.txt          # Python dependencies
+├── .env                      # Environment variables (create this)
+├── models/                   # ML models directory
+│   ├── model_resnet.tflite
+│   └── model_number_recognition.tflite
+├── plates/                   # Input images directory
+├── docs/                     # Documentation and assets
+│   └── app_icon.ico
+└── logs/                     # Application logs
+```
 
-5. Структура БД.
+## 🛠️ Installation & Setup
 
-    ![alt text](docs/IMG_ERD.png)
+### 1. Install Dependencies
 
----
+```bash
+pip install -r requirements.txt
+```
 
-## Запуск
+### 2. Configure Environment Variables
 
-1. Перейдите в папку приложения:
+Create a `.env` file in the project root:
 
-    ```bash
-    cd <Путь-к-приложению>
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=license_plate_db
+DB_USER=your_username
+DB_PASSWORD=your_password
+```
 
-2. Запустите проект:
+### 3. Database Setup
 
-    ```bash
-    python main.py
+Ensure your PostgreSQL database has the required tables:
 
-3. После запуска откроется графическое окно приложения.
+- `driver` (driver information)
+- `vehicle` (vehicle registration)
+- `log` (access logs)
+- `private.account` (user authentication)
 
-    ![alt text](docs/IMG_window.png)
+### 4. Run the Application
 
-4. **Распознавание:** \
-    Приложение автоматически начнет распознавание, как только в папку **plates** будет добавлено новое изображение.\
-    Результаты распознавания будут отображаться в текстовом поле приложения:\
-    Если номер найден в базе данных, появится сообщение: *Вход разрешен*.\
-    Если номер не найден, появится сообщение: *Вход запрещен*.\
-    Изображение с выделенным номером будет отображаться в интерфейсе приложения.
+```bash
+# Run the improved version
+python main_improved.py
 
----
+# Or run the original (not recommended)
+python main.py
+```
 
-## Лицензия
+## 🎯 Key Features
 
-Этот проект распространяется под лицензией MIT. Подробнее см. в файле LICENSE.
+### **License Plate Recognition**
 
----
+- Real-time processing of images in the `plates/` directory
+- Advanced image preprocessing with rotation correction
+- Deep learning models for plate detection and text recognition
+- Support for multiple image formats (JPG, PNG, BMP)
 
-## Поддержка
+### **Database Integration**
 
-Если у вас возникли вопросы или проблемы, создайте issue в репозитории проекта или свяжитесь с автором:
-    Email: <cadetstepan13@gmail.com>
-    GitHub: <https://github.com/Holodilni4ek>
+- PostgreSQL integration with connection pooling
+- Automatic logging of vehicle access events
+- Real-time data updates in the UI
+- Export functionality to Excel
+
+### **User Management**
+
+- Secure authentication system
+- User registration with proper validation
+- Role-based access (can be extended)
+
+### **Vehicle Management**
+
+- Add/edit driver information
+- Vehicle registration with driver assignment
+- Real-time vehicle status tracking
+
+### **Monitoring & Logging**
+
+- File system monitoring for new images
+- Comprehensive application logging
+- Error tracking and debugging information
+- Performance metrics
+
+## 🔧 Configuration Options
+
+The `config.py` file provides centralized configuration:
+
+```python
+# UI Settings
+ui.window_width = 1000
+ui.window_height = 800
+
+# Date Range
+dates.min_date = "2025-01-01"
+dates.max_date = "2025-12-31"
+
+# Processing Settings
+processing.image_size = 1024
+processing.rotation_threshold = 20.0
+
+# Model URLs (automatically downloaded)
+models.resnet_url = "https://..."
+models.recognition_url = "https://..."
+```
+
+## 📊 Database Schema
+
+### Core Tables
+
+- **driver**: Driver information (ID, name, birth date, nationality)
+- **vehicle**: Vehicle registration (ID, plate number, color, type, driver_id)
+- **log**: Access logs (ID, vehicle_id, timestamp, entry/exit type)
+- **private.account**: User accounts (login hash, password hash)
+
+## 🚨 Error Handling
+
+The improved system handles various error scenarios:
+
+- **Database connection failures** - Graceful fallback with user notification
+- **Model loading errors** - Background retry with status updates
+- **Image processing failures** - Skip invalid files, log errors
+- **Network issues** - Offline mode for core functionality
+- **Authentication failures** - Secure error messages
+
+## 🔒 Security Features
+
+- **Password hashing** using SHA-256
+- **SQL injection prevention** via parameterized queries
+- **Input sanitization** for all user inputs
+- **Secure configuration** via environment variables
+- **Connection security** with proper database credentials handling
+
+## 📈 Performance Improvements
+
+### Before vs After
+
+- **Database connections**: Raw connections → Connection pooling
+- **Error handling**: Basic try-catch → Comprehensive error management
+- **Code organization**: Monolithic file → Modular architecture
+- **Memory usage**: Memory leaks → Proper resource cleanup
+- **Processing speed**: Synchronous → Asynchronous background processing
+
+## 🐛 Debugging
+
+### Log Files
+
+- Application logs: `app.log`
+- Error details with stack traces
+- Performance metrics and timing information
+
+### Common Issues
+
+1. **Database connection errors** - Check `.env` file and database status
+2. **Model download failures** - Verify internet connection and URLs
+3. **Image processing errors** - Check image format and file permissions
+4. **UI freezing** - Background processing should prevent this
+
+## 🔄 Migration from Original
+
+To migrate from the original `main.py`:
+
+1. **Backup your database** and configuration
+2. **Install new requirements**: `pip install -r requirements.txt`
+3. **Create `.env` file** with your database credentials
+4. **Run the improved version**: `python main_improved.py`
+5. **Test all functionality** before removing the old version
+
+## 🤝 Contributing
+
+When contributing to this improved version:
+
+1. Follow the modular architecture patterns
+2. Add proper error handling and logging
+3. Include type hints for better code documentation
+4. Write unit tests for new functionality
+5. Update documentation accordingly
+
+## 📄 License
+
+This improved version maintains the same licensing as the original project while adding significant enhancements for production use.

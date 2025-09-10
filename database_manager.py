@@ -7,7 +7,9 @@ Handles database connections, connection pooling, and common database operations
 import logging
 import os
 from contextlib import contextmanager
+from datetime import date
 from typing import Dict, List, Tuple, Optional, Any
+from datetime import date
 
 import psycopg2
 from psycopg2 import pool
@@ -231,6 +233,70 @@ class DatabaseManager:
             return False
         except Exception as e:
             logging.error(f"Authentication failed: {e}")
+            return False
+
+    def get_all_users(self) -> List[Tuple[int, str]]:
+        """Retrieve all users from the database."""
+        import hashlib
+
+        query = "SELECT id, login FROM private.account"
+        try:
+            result = self.execute_query(query)
+            return [tuple(row) for row in result]
+        except Exception as e:
+            logging.error(f"Failed to retrieve users: {e}")
+            return []
+
+    def get_all_drivers(self) -> List[Tuple[int, str, date, str]]:
+        """Retrieve all drivers from the database."""
+
+        query = "SELECT id_driver, concat_ws(' ', driver_firstname, driver_secondname, driver_patronymic), driver_birthdate, driver_nationality FROM public.driver"
+        try:
+            result = self.execute_query(query)
+            return [tuple(row) for row in result]
+        except Exception as e:
+            logging.error(f"Failed to retrieve drivers: {e}")
+            return []
+
+    def get_all_vehicles(self) -> List[Tuple[int, str, str, str]]:
+        """Retrieve all vehicles from the database."""
+
+        query = "SELECT id_vehicle, vehicle_mark, vehicle_color, vehicle_type FROM public.vehicle"
+        try:
+            result = self.execute_query(query)
+            return [tuple(row) for row in result]
+        except Exception as e:
+            logging.error(f"Failed to retrieve drivers: {e}")
+            return []
+
+    def delete_user(self, user_id: int) -> bool:
+        """Delete a user by ID."""
+        query = "DELETE FROM private.account WHERE id = %s"
+        try:
+            affected_rows = self.execute_update(query, (user_id,))
+            return affected_rows > 0
+        except Exception as e:
+            logging.error(f"Failed to delete user with ID {user_id}: {e}")
+            return False
+
+    def delete_driver(self, driver_id: int) -> bool:
+        """Delete a driver by ID."""
+        query = "DELETE FROM public.driver WHERE id_driver = %s"
+        try:
+            affected_rows = self.execute_update(query, (driver_id,))
+            return affected_rows > 0
+        except Exception as e:
+            logging.error(f"Failed to delete driver with ID {driver_id}: {e}")
+            return False
+
+    def delete_vehicle(self, vehicle_id: int) -> bool:
+        """Delete a vehicle by ID."""
+        query = "DELETE FROM public.account WHERE id_vehicle = %s"
+        try:
+            affected_rows = self.execute_update(query, (vehicle_id,))
+            return affected_rows > 0
+        except Exception as e:
+            logging.error(f"Failed to delete vehicle with ID {vehicle_id}: {e}")
             return False
 
     def close(self):
