@@ -8,7 +8,7 @@ import os
 import sys
 import threading
 import logging
-from typing import Optional
+from typing import Dict, List, Tuple, Optional, Any
 import hashlib
 
 import cv2
@@ -656,7 +656,6 @@ class LoginFrame(wx.Dialog):
             parent, title=self.lang.get_text("auth_title"), size=(300, 200)
         )
         self.db = get_db_manager()
-        self.logged_in = False
         self.create_ui()
         self.Centre()
 
@@ -1387,7 +1386,7 @@ class AddUserFrame(wx.Frame):
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         # Form fields
-        form_sizer = wx.FlexGridSizer(2, 2, 10, 10)
+        form_sizer = wx.FlexGridSizer(3, 2, 10, 10)
 
         # Username
         form_sizer.Add(
@@ -1410,6 +1409,15 @@ class AddUserFrame(wx.Frame):
         form_sizer.AddGrowableCol(1, 1)
         vbox.Add(form_sizer, 1, wx.EXPAND | wx.ALL, 15)
 
+        # Super user checkbox (optional)
+        form_sizer.Add(
+            wx.StaticText(panel, label=self.lang.get_text("super_user")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL,
+        )
+        self.superuser_chk = wx.CheckBox(panel)
+        form_sizer.Add(self.superuser_chk, 1, wx.EXPAND)
+
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         add_btn = wx.Button(panel, label=self.lang.get_text("add_user"))
@@ -1426,6 +1434,7 @@ class AddUserFrame(wx.Frame):
 
     def on_add(self, event):
         """Add the user to database."""
+
         try:
             username = self.username_ctrl.GetValue().strip()
             password = self.password_ctrl.GetValue().strip()
@@ -1446,7 +1455,11 @@ class AddUserFrame(wx.Frame):
                 )
                 return
 
-            user_id = self.db.add_user(username, password)
+            if self.superuser_chk.GetValue():
+                token = self.db.get_token()
+                user_id = self.db.add_superuser(username, password, token)
+            else:
+                user_id = self.db.add_user(username, password)
 
             if user_id:
                 wx.MessageBox(

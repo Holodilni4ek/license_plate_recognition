@@ -199,7 +199,6 @@ class DatabaseManager:
         import hashlib
 
         # Hash the credentials
-        login_hash = hashlib.sha256(login.encode("utf-8")).hexdigest()
         password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
         query = """
@@ -208,16 +207,33 @@ class DatabaseManager:
         RETURNING login
         """
         try:
-            return self.execute_insert(query, (login_hash, password_hash))
+            return self.execute_insert(query, (login, password_hash))
         except Exception as e:
             logging.error(f"Failed to add user: {e}")
+            return None
+
+    def add_superuser(self, login: str, password: str, token: bool) -> Optional[int]:
+        """Add a new superuser account to the database."""
+        import hashlib
+
+        # Hash the credentials
+        password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+        query = """
+        INSERT INTO private.account (login, password, token) 
+        VALUES (%s, %s, %s) 
+        RETURNING login
+        """
+        try:
+            return self.execute_insert(query, (login, password_hash, token))
+        except Exception as e:
+            logging.error(f"Failed to add superuser: {e}")
             return None
 
     def authenticate_user(self, login: str, password: str) -> bool:
         """Authenticate a user login."""
         import hashlib
 
-        login_hash = hashlib.sha256(login.encode("utf-8")).hexdigest()
         password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
         query = """
@@ -226,13 +242,53 @@ class DatabaseManager:
         LIMIT 1
         """
         try:
-            result = self.execute_query(query, (login_hash,))
+            result = self.execute_query(query, (login,))
             if result and len(result) > 0:
                 stored_login, stored_password = result[0]
-                return stored_login == login_hash and stored_password == password_hash
+                return stored_login == login and stored_password == password_hash
             return False
         except Exception as e:
             logging.error(f"Authentication failed: {e}")
+            return False
+
+    def token(self) -> Optional[str]:
+        """Retrieve the superuser token for a given login."""
+        query = """
+        SELECT token FROM private.account 
+        WHERE login = 'token' 
+        LIMIT 1
+        """
+        try:
+            result = self.execute_query(query)
+            if result and len(result) > 0:
+                return result[0][0]  # Return the token value
+            return None
+        except Exception as e:
+            logging.error(f"Failed to retrieve token: {e}")
+            return None
+
+    def get_token(self, login: str) -> bool:
+        """Check if a user is a superuser."""
+        token = self.token()
+
+        query = """
+        SELECT token FROM private.account 
+        WHERE login = %s AND token = %s
+        LIMIT 1
+        """
+        try:
+            result = self.execute_query(
+                query,
+                (
+                    login,
+                    token,
+                ),
+            )
+            if result and len(result) > 0:
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Failed to check superuser status: {e}")
             return False
 
     def get_all_users(self) -> List[Tuple[int, str]]:

@@ -124,6 +124,7 @@ class LanguageManager:
             "vehicle_add_error": "Ошибка при добавлении автомобиля: {}",
             # Add User Dialog
             "add_user_title": "Добавление пользователя",
+            "super_user": "Право суперпользователя",
             "username_password_required": "Имя пользователя и пароль обязательны",
             "password_min_length": "Пароль должен содержать минимум 6 символов",
             "user_added": "Пользователь успешно добавлен",
@@ -235,6 +236,7 @@ class LanguageManager:
             "vehicle_add_error": "Error adding vehicle: {}",
             # Add User Dialog
             "add_user_title": "Add User",
+            "super_user": "Super User Privilege",
             "username_password_required": "Username and password are required",
             "password_min_length": "Password must be at least 6 characters",
             "user_added": "User added successfully",
